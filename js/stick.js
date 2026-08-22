@@ -21,22 +21,158 @@
     ctx.stroke();
   }
 
-  /* pose returns joint offsets relative to the body origin (feet centre) */
-  function poseOf(pose, phase, facing) {
-    const f = facing;
-    if (pose === 'jump') {
+  /* ---- bought animations: each returns the same {legs, arms, lean, drop} shape ---- */
+  const WALK = {
+    walk_classic(f, ph) {
+      const s = Math.sin(ph), c = Math.cos(ph);
       return {
-        legs: [[f * 2.5, HIP + 5, f * 5.5, HIP + 8.0], [-f * 3.5, HIP + 6, -f * 2.5, HIP + 10.5]],
+        legs: [[f * (s * 2.5) + f * 1, HIP + 5.5, f * (s * 6.5), HIP + 11 - Math.max(0, c) * 2.2],
+               [f * (-s * 2.5) - f * 1, HIP + 5.5, f * (-s * 6.5), HIP + 11 - Math.max(0, -c) * 2.2]],
+        arms: [[f * (-s * 3.4) + f * 3.4, SHOULDER + 3.6, f * (-s * 6) + f * 3.2, SHOULDER + 7.6],
+               [f * (s * 3.4) - f * 3.4, SHOULDER + 3.6, f * (s * 6) - f * 3.2, SHOULDER + 7.6]],
+        lean: f * 1.6
+      };
+    },
+    walk_strut(f, ph) {
+      const s = Math.sin(ph), c = Math.cos(ph);
+      return {
+        legs: [[f * s * 3.6, HIP + 4.2 - Math.max(0, c) * 2.4, f * s * 8, HIP + 11 - Math.max(0, c) * 4],
+               [f * -s * 3.6, HIP + 4.2 - Math.max(0, -c) * 2.4, f * -s * 8, HIP + 11 - Math.max(0, -c) * 4]],
+        arms: [[f * (-s * 5) + f * 2, SHOULDER + 1, f * (-s * 8.5) + f * 1, SHOULDER - 3.5],
+               [f * (s * 5) - f * 2, SHOULDER + 1, f * (s * 8.5) - f * 1, SHOULDER - 3.5]],
+        lean: -f * 0.4
+      };
+    },
+    walk_shuffle(f, ph) {
+      const s = Math.sin(ph * 1.6);
+      return {
+        legs: [[f * s * 1.2 + f * 1.4, HIP + 5.6, f * s * 3, 0],
+               [f * -s * 1.2 - f * 1.4, HIP + 5.6, f * -s * 3, 0]],
+        arms: [[f * 4.6, SHOULDER + 4.5, f * 5.4, SHOULDER + 9], [-f * 4.6, SHOULDER + 4.5, -f * 5.4, SHOULDER + 9]],
+        lean: f * 0.6, drop: 1.2
+      };
+    },
+    walk_sprint(f, ph) {
+      const s = Math.sin(ph), c = Math.cos(ph);
+      return {
+        legs: [[f * (s * 3.4) + f * 2, HIP + 5, f * (s * 7.5) + f * 2, HIP + 11 - Math.max(0, c) * 3],
+               [f * (-s * 3.4) + f * 1, HIP + 5, f * (-s * 7.5), HIP + 11 - Math.max(0, -c) * 3]],
+        arms: [[f * (-s * 4) + f * 4.5, SHOULDER + 2.5, f * (-s * 4) + f * 7.5, SHOULDER - 0.5],
+               [f * (s * 4) - f * 1.5, SHOULDER + 2.5, f * (s * 4) - f * 4.5, SHOULDER - 0.5]],
+        lean: f * 4.2
+      };
+    },
+    walk_moon(f, ph) {
+      const s = Math.sin(ph * 0.8);
+      return {
+        legs: [[f * 2, HIP + 5.5, f * (5.5 + s * 3), 0],
+               [-f * 1.5, HIP + 6, -f * (2 + s * 4), HIP + 10]],
+        arms: [[f * 5.5, SHOULDER + 2, f * 8, SHOULDER - 2], [-f * 5, SHOULDER + 3.5, -f * 7, SHOULDER + 7]],
+        lean: -f * 2.6
+      };
+    }
+  };
+
+  const JUMP = {
+    jump_classic(f, ph, rising) {
+      if (rising) return {
+        legs: [[f * 2.5, HIP + 5, f * 5.5, HIP + 8], [-f * 3.5, HIP + 6, -f * 2.5, HIP + 10.5]],
         arms: [[f * 4.5, SHOULDER - 3.5, f * 6.5, SHOULDER - 8.5], [-f * 4.5, SHOULDER - 3, -f * 6, SHOULDER - 8]],
         lean: f * 1.2
       };
-    }
-    if (pose === 'fall') {
       return {
         legs: [[f * 5, HIP + 6, f * 8, HIP + 10.5], [-f * 4.5, HIP + 6.5, -f * 7, HIP + 11]],
         arms: [[f * 6, SHOULDER - 1.5, f * 8.5, SHOULDER - 5.5], [-f * 6, SHOULDER - 1, -f * 8.5, SHOULDER - 5]],
         lean: -f * 0.8
       };
+    },
+    jump_hero(f, ph, rising) {
+      return {
+        legs: [[f * -2, HIP + 5, f * -6.5, HIP + 8.5], [-f * 4, HIP + 6.5, -f * 8.5, HIP + 11]],
+        arms: [[f * 6.5, SHOULDER - 3, f * 12, SHOULDER - 6.5], [-f * 4, SHOULDER + 3, -f * 6.5, SHOULDER + 6.5]],
+        lean: f * 3.4
+      };
+    },
+    jump_tuck(f, ph, rising) {
+      const t = rising ? 0 : 1.2;
+      return {
+        legs: [[f * 4.5, HIP + 1.5 + t, f * 3, HIP - 3 + t], [-f * 4.5, HIP + 2 + t, -f * 3, HIP - 2.5 + t]],
+        arms: [[f * 5, SHOULDER + 3, f * 3.5, SHOULDER + 7], [-f * 5, SHOULDER + 3, -f * 3.5, SHOULDER + 7]],
+        lean: f * 0.4, drop: -2
+      };
+    },
+    jump_star(f, ph) {
+      return {
+        legs: [[f * 6, HIP + 5, f * 11, HIP + 9], [-f * 6, HIP + 5, -f * 11, HIP + 9]],
+        arms: [[f * 7, SHOULDER - 3, f * 12, SHOULDER - 7], [-f * 7, SHOULDER - 3, -f * 12, SHOULDER - 7]],
+        lean: 0
+      };
+    },
+    jump_swim(f, ph) {
+      const a = ph * 3.2, s = Math.sin(a), c = Math.cos(a);
+      return {
+        legs: [[f * (2 + s * 3), HIP + 5.5, f * (5 + s * 4), HIP + 10],
+               [f * (-2 - s * 3), HIP + 5.5, f * (-5 - s * 4), HIP + 10]],
+        arms: [[f * (c * 6), SHOULDER - 2 + s * 3, f * (c * 10), SHOULDER - 4 + s * 5],
+               [f * (-c * 6), SHOULDER - 2 - s * 3, f * (-c * 10), SHOULDER - 4 - s * 5]],
+        lean: f * 0.8
+      };
+    }
+  };
+
+  const IDLE = {
+    idle_classic(f, ph) {
+      const b = Math.sin(ph * 0.5) * 0.35;
+      return {
+        legs: [[f * 2.0, HIP + 5.5, f * 3.6, 0], [-f * 2.0, HIP + 5.5, -f * 3.6, 0]],
+        arms: [[f * 5.4, SHOULDER + 3.5 + b, f * 6.4, SHOULDER + 8 + b], [-f * 5.4, SHOULDER + 3.5 - b, -f * 6.4, SHOULDER + 8 - b]],
+        lean: 0
+      };
+    },
+    idle_bounce(f, ph) {
+      const d = (Math.sin(ph * 2.4) * 0.5 + 0.5) * 2.6;
+      return {
+        legs: [[f * 2.6, HIP + 5.5, f * 3.6, 0], [-f * 2.6, HIP + 5.5, -f * 3.6, 0]],
+        arms: [[f * 5.2, SHOULDER + 4, f * 6.2, SHOULDER + 8.5], [-f * 5.2, SHOULDER + 4, -f * 6.2, SHOULDER + 8.5]],
+        lean: 0, drop: d
+      };
+    },
+    idle_tap(f, ph) {
+      const lift = Math.max(0, Math.sin(ph * 5)) * 2.6;
+      return {
+        legs: [[f * 2.2, HIP + 5.5, f * 3.6, 0], [-f * 2.2, HIP + 5.5 - lift * 0.5, -f * 3.8, -lift]],
+        arms: [[f * 6.5, SHOULDER + 3, f * 4.5, SHOULDER + 6], [-f * 6.5, SHOULDER + 3, -f * 4.5, SHOULDER + 6]],
+        lean: 0
+      };
+    },
+    idle_tpose(f) {
+      return {
+        legs: [[f * 2.2, HIP + 5.5, f * 3.2, 0], [-f * 2.2, HIP + 5.5, -f * 3.2, 0]],
+        arms: [[f * 6.5, SHOULDER, f * 13, SHOULDER], [-f * 6.5, SHOULDER, -f * 13, SHOULDER]],
+        lean: 0
+      };
+    },
+    idle_dance(f, ph) {
+      const s = Math.sin(ph * 2.2), c = Math.cos(ph * 2.2);
+      return {
+        legs: [[f * (2.4 + s), HIP + 5.5, f * 3.6, 0], [-f * (2.4 - s), HIP + 5.5, -f * 3.6, 0]],
+        arms: [[f * (5 + s * 2), SHOULDER + 2 - c * 3, f * (6.5 + s * 3), SHOULDER + 5 - c * 5],
+               [-f * (5 - s * 2), SHOULDER + 2 + c * 3, -f * (6.5 - s * 3), SHOULDER + 5 + c * 5]],
+        lean: s * 2.2, drop: Math.abs(s) * 1.2
+      };
+    }
+  };
+
+  const styleOf = (table, id, fallback) => table[id] || table[fallback];
+
+  /* pose returns joint offsets relative to the body origin (feet centre) */
+  function poseOf(pose, phase, facing, styles) {
+    const f = facing;
+    const st = styles || {};
+    if (pose === 'run') return styleOf(WALK, st.walk, 'walk_classic')(f, phase);
+    if (pose === 'idle') return styleOf(IDLE, st.idle, 'idle_classic')(f, phase);
+    if (pose === 'jump' || pose === 'fall') {
+      return styleOf(JUMP, st.jump, 'jump_classic')(f, phase, pose === 'jump');
     }
     if (pose === 'punch') {
       /* lead arm straight out, back arm cocked, feet planted */
@@ -69,27 +205,7 @@
         lean: f * 2.4
       };
     }
-    if (pose === 'run') {
-      const s = Math.sin(phase), c = Math.cos(phase);
-      return {
-        legs: [
-          [f * (s * 2.5) + f * 1, HIP + 5.5, f * (s * 6.5), HIP + 11 - Math.max(0, c) * 2.2],
-          [f * (-s * 2.5) - f * 1, HIP + 5.5, f * (-s * 6.5), HIP + 11 - Math.max(0, -c) * 2.2]
-        ],
-        arms: [
-          [f * (-s * 3.4) + f * 3.4, SHOULDER + 3.6, f * (-s * 6) + f * 3.2, SHOULDER + 7.6],
-          [f * (s * 3.4) - f * 3.4, SHOULDER + 3.6, f * (s * 6) - f * 3.2, SHOULDER + 7.6]
-        ],
-        lean: f * 1.6
-      };
-    }
-    /* idle */
-    const b = Math.sin(phase * 0.5) * 0.35;
-    return {
-      legs: [[f * 2.0, HIP + 5.5, f * 3.6, 0], [-f * 2.0, HIP + 5.5, -f * 3.6, 0]],
-      arms: [[f * 5.4, SHOULDER + 3.5 + b, f * 6.4, SHOULDER + 8 + b], [-f * 5.4, SHOULDER + 3.5 - b, -f * 6.4, SHOULDER + 8 - b]],
-      lean: 0
-    };
+    return IDLE.idle_classic(f, phase);
   }
 
   function drawHat(ctx, hatId, colour, t, facing) {
@@ -173,7 +289,10 @@
     const colour = o.colour || skinColour(o.skin, t);
     const skin = SL.items.byId[o.skin];
     const fx = skin ? skin.fx : null;
-    const p = poseOf(o.pose || 'idle', o.phase || 0, facing);
+    const eq = (slot) => (SL.save && SL.save.equipped ? SL.save.equipped(slot) : null);
+    const styles = o.styles || { walk: o.walk || eq('walk'), jump: o.jump || eq('jump'), idle: o.idle || eq('idle') };
+    const p = poseOf(o.pose || 'idle', o.phase || 0, facing, styles);
+    const D = p.drop || 0;
 
     ctx.save();
     if (o.rot) ctx.rotate(o.rot);                 // used when he trips over
@@ -195,16 +314,17 @@
     /* build reshapes how far the limbs reach out; it never moves the feet or
        the head height, so the 18x30 hitbox stays honest */
     const sx = b.spread, sl = b.legs;
+    const HIPD = HIP + D, SHD = SHOULDER + D;
     const L0 = p.legs[0], L1 = p.legs[1], A0 = p.arms[0], A1 = p.arms[1];
-    /* legs */
-    limb(ctx, 0, HIP, L0[0] * sl, L0[1], L0[2] * sl, L0[3]);
-    limb(ctx, 0, HIP, L1[0] * sl, L1[1], L1[2] * sl, L1[3]);
+    /* legs — the hip drops, the feet stay put, so the knees bend */
+    limb(ctx, 0, HIPD, L0[0] * sl, L0[1] + D * 0.55, L0[2] * sl, L0[3]);
+    limb(ctx, 0, HIPD, L1[0] * sl, L1[1] + D * 0.55, L1[2] * sl, L1[3]);
     /* torso, with a gut on the heavier builds */
-    ctx.beginPath(); ctx.moveTo(0, HIP); ctx.lineTo(p.lean, SHOULDER); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, HIPD); ctx.lineTo(p.lean, SHD); ctx.stroke();
     if (b.belly > 0) {
       /* a big gut sags below the waist and grows taller as it grows wider,
          while the limbs keep whatever weight the build gave them */
-      const cy = (HIP + SHOULDER) / 2 + b.belly * 0.14;
+      const cy = (HIPD + SHD) / 2 + b.belly * 0.14;
       const ry = (HIP - SHOULDER) / 2 + 0.5 + b.belly * 0.18;
       const lw = ctx.lineWidth;
       ctx.lineWidth = lw * 1.12;
@@ -214,23 +334,23 @@
       ctx.lineWidth = lw;
     }
     /* arms */
-    limb(ctx, p.lean, SHOULDER, A0[0] * sx, A0[1], A0[2] * sx, A0[3]);
-    limb(ctx, p.lean, SHOULDER, A1[0] * sx, A1[1], A1[2] * sx, A1[3]);
+    limb(ctx, p.lean, SHD, A0[0] * sx, A0[1] + D, A0[2] * sx, A0[3] + D);
+    limb(ctx, p.lean, SHD, A1[0] * sx, A1[1] + D, A1[2] * sx, A1[3] + D);
     /* head */
     ctx.beginPath();
-    ctx.arc(p.lean * 1.4, HEAD_Y, HEAD_R * b.head, 0, Math.PI * 2);
+    ctx.arc(p.lean * 1.4, HEAD_Y + D, HEAD_R * b.head, 0, Math.PI * 2);
     ctx.stroke();
     if (fx === 'ghost') { ctx.globalAlpha *= 0.35; ctx.fill(); ctx.globalAlpha /= 0.35; }
 
     /* eyes — a tiny bit of life */
     ctx.shadowBlur = 0;
     ctx.fillStyle = colour;
-    const ex = p.lean * 1.4 + facing * 1.4 * b.head, ey = HEAD_Y - 0.5;
+    const ex = p.lean * 1.4 + facing * 1.4 * b.head, ey = HEAD_Y + D - 0.5;
     ctx.beginPath(); ctx.arc(ex, ey, 0.65 * b.head, 0, 7); ctx.fill();
     ctx.beginPath(); ctx.arc(ex - facing * 2.5 * b.head, ey, 0.65 * b.head, 0, 7); ctx.fill();
 
     ctx.save();
-    ctx.translate(p.lean * 1.4, 0);
+    ctx.translate(p.lean * 1.4, D);
     ctx.scale(b.head, b.head);
     ctx.translate(0, HEAD_Y * (1 / b.head - 1));      // keep the hat on the head
     drawHat(ctx, o.hat, colour, t, facing);

@@ -151,12 +151,16 @@ Harbour Lights, Uluru at Dusk, Snowy Peaks, Southern Cross.
 | Guardian | start each attempt with a shield that soaks one hazard |
 | Checkpoint Beacon | respawn at the halfway mark instead of the bottom |
 
-Seven **builds** change his shape — Classic, Lanky, Stocky, Pot Belly, Absolute Unit, Buff and
-Pipsqueak —
+Six **builds** change his shape — Classic, Lanky, Stocky, Absolute Unit, Buff and Pipsqueak —
 altering line weight, limb spread, head size and, on the heavier ones, a gut. These are drawing
 only: the hitbox stays 18×30 whatever you pick, so nothing about the physics or a level's
 difficulty shifts. Enemies in the Fight Pit and the Smash Lab draw from the same set, so a crowd
 is a crowd of different shapes.
+
+**Animations** are three more slots, mixed and matched from one tab: how he walks (Strut, Shuffle,
+Sprinter, Moonwalk), how he jumps (Superhero, Cannonball, Star Jump, Doggy Paddle) and how he
+stands about (Bouncer, Impatient, T-Pose, Little Dance). Every shop card plays the motion it is
+selling rather than showing a still.
 
 Plus ten skins (some with glow, ghosting, sparkle, ember and hue-cycling effects) and eight hats,
 including a cork hat and an Akubra. Everything is drawn live — the shop previews are the same

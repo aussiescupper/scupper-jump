@@ -101,17 +101,37 @@
   }
 
   /* ---------------- shop ---------------- */
-  function preview(skinId, hatId, buildId) {
+  function preview(skinId, hatId, buildId, opts) {
+    opts = opts || {};
     const c = document.createElement('canvas');
     const size = 56, dpr = Math.min(2, window.devicePixelRatio || 1);
     c.width = size * dpr; c.height = size * dpr;
     const x = c.getContext('2d');
-    x.setTransform(dpr, 0, 0, dpr, 0, 0);
-    x.save();
-    x.translate(size / 2, size - 6);
-    x.scale(1.16, 1.16);
-    SL.stick.draw(x, { skin: skinId, hat: hatId, build: buildId, pose: 'idle', phase: 1.2, facing: 1, t: 0.6 });
-    x.restore();
+    const paint = (phase) => {
+      x.setTransform(dpr, 0, 0, dpr, 0, 0);
+      x.clearRect(0, 0, size, size);
+      x.save();
+      x.translate(size / 2, size - 6);
+      x.scale(1.16, 1.16);
+      SL.stick.draw(x, { skin: skinId, hat: hatId, build: buildId,
+        styles: opts.styles, pose: opts.pose || 'idle',
+        phase, facing: 1, t: 0.6 });
+      x.restore();
+    };
+    if (opts.animate) {
+      /* the card plays the motion it is selling */
+      let ph = 0;
+      const tick = () => {
+        if (!c.isConnected) return;             // card gone: stop
+        ph += 0.11;
+        paint(ph);
+        requestAnimationFrame(tick);
+      };
+      paint(0);
+      requestAnimationFrame(tick);
+    } else {
+      paint(1.2);
+    }
     return c;
   }
 
@@ -122,13 +142,24 @@
     const items = SL.items.list(shopTab);
     const credits = SL.save.credits();
 
+    let lastGroup = null;
     for (const it of items) {
+      if (it.group && it.group !== lastGroup) {
+        lastGroup = it.group;
+        grid.appendChild(el('h3', 'shop-group', it.group));
+      }
       const card = el('div', 'card');
       const art = el('div', 'card-art');
 
       if (it.type === 'skin') art.appendChild(preview(it.id, SL.save.equipped('hat'), SL.save.equipped('build')));
       else if (it.type === 'hat') art.appendChild(preview(SL.save.equipped('skin'), it.id, SL.save.equipped('build')));
       else if (it.type === 'build') art.appendChild(preview(SL.save.equipped('skin'), SL.save.equipped('hat'), it.id));
+      else if (it.type === 'walk' || it.type === 'jump' || it.type === 'idle') {
+        const styles = { walk: SL.save.equipped('walk'), jump: SL.save.equipped('jump'), idle: SL.save.equipped('idle') };
+        styles[it.type] = it.id;
+        art.appendChild(preview(SL.save.equipped('skin'), SL.save.equipped('hat'), SL.save.equipped('build'),
+          { styles, pose: it.type === 'walk' ? 'run' : it.type === 'jump' ? 'jump' : 'idle', animate: true }));
+      }
       else art.textContent = it.glyph;
       card.appendChild(art);
 

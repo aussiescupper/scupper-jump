@@ -39,12 +39,33 @@
       lw: 1.45, head: 1.08, spread: 0.9,  belly: 3.2, legs: 0.9 },
     { id: 'build_chonk',   name: 'Absolute Unit', price: 700, desc: 'A gut you could rest a pint on.',
       lw: 2.1,  head: 1.15, spread: 0.82, belly: 6.5, legs: 0.86 },
-    { id: 'build_pot',     name: 'Pot Belly', price: 500, desc: 'Enormous gut. Arms and legs barely changed.',
-      lw: 1.35, head: 1.02, spread: 1.22, belly: 8.9, legs: 1.08 },
     { id: 'build_buff',    name: 'Buff',     price: 900,  desc: 'Shoulders like a doorway.',
       lw: 1.9,  head: 0.95, spread: 1.2,  belly: 1.6, legs: 1 },
     { id: 'build_pip',     name: 'Pipsqueak', price: 550, desc: 'Big head, little everything else.',
       lw: 0.95, head: 1.45, spread: 0.82, belly: 0,   legs: 0.88 }
+  ];
+
+  /* --------- animations: how he moves. Three slots, mix and match. --------- */
+  const WALKS = [
+    { id: 'walk_classic', name: 'Normal Walk',  price: 0,   desc: 'One foot after the other.' },
+    { id: 'walk_strut',   name: 'Strut',        price: 180, desc: 'High knees, big arm swings.' },
+    { id: 'walk_shuffle', name: 'Shuffle',      price: 180, desc: 'Tiny steps, arms hanging.' },
+    { id: 'walk_sprint',  name: 'Sprinter',     price: 320, desc: 'Bent right forward, arms pumping.' },
+    { id: 'walk_moon',    name: 'Moonwalk',     price: 650, desc: 'Leaning back, feet sliding.' }
+  ];
+  const JUMPS = [
+    { id: 'jump_classic', name: 'Normal Jump',  price: 0,   desc: 'Arms up, legs tucked.' },
+    { id: 'jump_hero',    name: 'Superhero',    price: 260, desc: 'One fist out, legs trailing.' },
+    { id: 'jump_tuck',    name: 'Cannonball',   price: 220, desc: 'Knees hugged to the chest.' },
+    { id: 'jump_star',    name: 'Star Jump',    price: 300, desc: 'Everything out at once.' },
+    { id: 'jump_swim',    name: 'Doggy Paddle', price: 480, desc: 'Swimming through thin air.' }
+  ];
+  const IDLES = [
+    { id: 'idle_classic', name: 'Normal Stand', price: 0,   desc: 'Just breathing.' },
+    { id: 'idle_bounce',  name: 'Bouncer',      price: 160, desc: 'Never quite still.' },
+    { id: 'idle_tap',     name: 'Impatient',    price: 200, desc: 'Tapping a foot at you.' },
+    { id: 'idle_tpose',   name: 'T-Pose',       price: 400, desc: 'Asserting dominance.' },
+    { id: 'idle_dance',   name: 'Little Dance', price: 520, desc: 'Swaying to nothing at all.' }
   ];
 
   /* --------- gear: tiered, permanent, changes how you play --------- */
@@ -79,6 +100,9 @@
   SKINS.forEach(s => (byId[s.id] = Object.assign({ type: 'skin' }, s)));
   HATS.forEach(h => (byId[h.id] = Object.assign({ type: 'hat' }, h)));
   BUILDS.forEach(b => (byId[b.id] = Object.assign({ type: 'build' }, b)));
+  WALKS.forEach(w => (byId[w.id] = Object.assign({ type: 'walk', group: 'Walking' }, w)));
+  JUMPS.forEach(j => (byId[j.id] = Object.assign({ type: 'jump', group: 'Jumping' }, j)));
+  IDLES.forEach(i => (byId[i.id] = Object.assign({ type: 'idle', group: 'Standing' }, i)));
   GEAR.forEach(g => (byId[g.id] = Object.assign({ type: 'upgrade' }, g)));
 
   /* Roll every owned upgrade into one set of numbers the game reads each frame. */
@@ -108,7 +132,10 @@
 
   const buildOf = (id) => byId[id] || byId.build_classic;
 
-  SL.items = { SKINS, HATS, GEAR, BUILDS, byId, modifiers, price, maxTier, buildOf,
+  const ANIMS = WALKS.concat(JUMPS, IDLES);
+
+  SL.items = { SKINS, HATS, GEAR, BUILDS, WALKS, JUMPS, IDLES, ANIMS,
+    byId, modifiers, price, maxTier, buildOf,
     list: (type) => (type === 'skin' ? SKINS : type === 'hat' ? HATS
-      : type === 'build' ? BUILDS : GEAR).map(i => byId[i.id]) };
+      : type === 'build' ? BUILDS : type === 'anim' ? ANIMS : GEAR).map(i => byId[i.id]) };
 })(window.SL);
