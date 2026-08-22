@@ -202,10 +202,16 @@
     /* torso, with a gut on the heavier builds */
     ctx.beginPath(); ctx.moveTo(0, HIP); ctx.lineTo(p.lean, SHOULDER); ctx.stroke();
     if (b.belly > 0) {
-      const cy = (HIP + SHOULDER) / 2;
+      /* a big gut sags below the waist and grows taller as it grows wider,
+         while the limbs keep whatever weight the build gave them */
+      const cy = (HIP + SHOULDER) / 2 + b.belly * 0.14;
+      const ry = (HIP - SHOULDER) / 2 + 0.5 + b.belly * 0.18;
+      const lw = ctx.lineWidth;
+      ctx.lineWidth = lw * 1.12;
       ctx.beginPath();
-      ctx.ellipse(p.lean * 0.5 + facing * b.belly * 0.22, cy, b.belly, (HIP - SHOULDER) / 2 + 0.5, 0, 0, Math.PI * 2);
+      ctx.ellipse(p.lean * 0.5 + facing * b.belly * 0.2, cy, b.belly, ry, 0, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.lineWidth = lw;
     }
     /* arms */
     limb(ctx, p.lean, SHOULDER, A0[0] * sx, A0[1], A0[2] * sx, A0[3]);

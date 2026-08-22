@@ -39,6 +39,8 @@
       lw: 1.45, head: 1.08, spread: 0.9,  belly: 3.2, legs: 0.9 },
     { id: 'build_chonk',   name: 'Absolute Unit', price: 700, desc: 'A gut you could rest a pint on.',
       lw: 2.1,  head: 1.15, spread: 0.82, belly: 6.5, legs: 0.86 },
+    { id: 'build_pot',     name: 'Pot Belly', price: 500, desc: 'Enormous gut. Arms and legs barely changed.',
+      lw: 1.35, head: 1.02, spread: 1.22, belly: 8.9, legs: 1.08 },
     { id: 'build_buff',    name: 'Buff',     price: 900,  desc: 'Shoulders like a doorway.',
       lw: 1.9,  head: 0.95, spread: 1.2,  belly: 1.6, legs: 1 },
     { id: 'build_pip',     name: 'Pipsqueak', price: 550, desc: 'Big head, little everything else.',
