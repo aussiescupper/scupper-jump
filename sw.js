@@ -1,5 +1,5 @@
 /* Scupper Jump service worker — offline-first, versioned cache. */
-const VERSION = 'scupper-jump-v1.2.1';
+const VERSION = 'scupper-jump-v1.2.2';
 const ASSETS = [
   './',
   './index.html',
@@ -25,9 +25,12 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (e) => {
+  /* {cache:'reload'} forces every precache fetch past the browser's HTTP cache.
+     Without it, a fresh deploy can be re-cached from stale copies that are still
+     inside their max-age window, and bumping VERSION quietly does nothing. */
   e.waitUntil(
     caches.open(VERSION)
-      .then((c) => c.addAll(ASSETS))
+      .then((c) => c.addAll(ASSETS.map((u) => new Request(u, { cache: 'reload' }))))
       .then(() => self.skipWaiting())
       .catch((err) => console.warn('[sw] precache', err))
   );

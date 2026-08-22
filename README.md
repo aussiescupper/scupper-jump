@@ -130,7 +130,9 @@ from any sub-path.
 * `manifest.webmanifest` — standalone display, portrait, maskable icons, shortcuts to Shop and Levels.
 * `sw.js` — precaches every asset on install, cache-first for assets, network-first for navigation
   so updates land. **Bump `VERSION` in `sw.js` whenever you ship**, or returning players keep the
-  old cache.
+  old cache. The precache fetches with `{cache: 'reload'}` so it cannot re-cache stale copies that
+  are still inside GitHub Pages' `max-age=600` window — without that, bumping `VERSION` can
+  silently do nothing for ten minutes after a deploy.
 * Icons are generated PNGs (192/512 plus maskable variants and an Apple touch icon).
 * Progress lives in `localStorage` under `scupperlab.jump.v1`.
 

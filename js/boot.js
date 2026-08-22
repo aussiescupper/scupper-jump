@@ -1,7 +1,7 @@
 /* Scupper Jump — wiring: canvas, input, PWA install, service worker */
 (function (SL) {
   'use strict';
-  SL.VERSION = '1.2.1';
+  SL.VERSION = '1.2.2';
 
   const canvas = document.getElementById('game');
 
