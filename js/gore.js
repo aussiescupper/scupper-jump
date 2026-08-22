@@ -10,6 +10,8 @@
   const W = LV.W;
 
   const G = 1750;                  // corpses fall a touch lazier than the living
+  /* Rooms can dial gravity down — the smash lab is deliberately floaty. */
+  const gmul = (S) => (S.level && S.level.gravityMul) || 1;
   const DAMP = 0.996;              // air drag on the ragdoll
   const ITER = 6;                  // constraint relaxation passes
   const BOUNCE = 0.34;
@@ -282,7 +284,7 @@
   function stepBody(S, rd, dt) {
     if (!rd || rd.asleep) return;
     const pts = rd.pts;
-    const grav = G * dt * dt;
+    const grav = G * gmul(S) * dt * dt;
 
     for (const p of pts) {
       if (p.noClip > 0) p.noClip -= dt;
@@ -465,7 +467,7 @@
   /* the guts: Verlet rope, same integrator and collisions as the ragdoll */
   function stepRopes(S, dt) {
     const g = S.gore;
-    const grav = G * dt * dt;
+    const grav = G * gmul(S) * dt * dt;
     for (const rope of g.ropes) {
       rope.wob += dt * 1.4;
       for (const p of rope.pts) {
@@ -503,7 +505,7 @@
       if (p.rest) continue;
       if (p.noClip > 0) p.noClip -= dt;
       const py = p.y;
-      p.vy -= G * dt;
+      p.vy -= G * gmul(S) * dt;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.rot += p.vrot * dt;
@@ -577,7 +579,7 @@
       d.life -= dt;
       if (d.life <= 0) { g.drops.splice(i, 1); continue; }
       const dy = d.y;
-      d.vy -= 1500 * dt;
+      d.vy -= 1500 * gmul(S) * dt;
       d.x += d.vx * dt;
       d.y += d.vy * dt;
       if (d.x < 1 || d.x > W - 1) { stain(S, clamp(d.x, 2, W - 2), d.y, d.r * 1.6, null); g.drops.splice(i, 1); continue; }

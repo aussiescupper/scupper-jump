@@ -679,13 +679,23 @@
     },
     get awaitingRetry() { return !!S.awaitRetry && !!S.player && S.player.dead; },
     restart() {
+      /* endless and the lab have no level number to reload — start them afresh */
+      const from = S.mode === 'pause' ? S.pausedFrom : S.mode;
+      if (from === 'lab') { api.startLab(); return; }
+      if (S.run && S.run.endless) { api.startEndless(); return; }
       const n = S.level ? S.level.n : 1;
       S.checkpoint = null;
       loadLevel(n, 'play');
     },
     nextLevel() { api.start((S.level ? S.level.n : 0) + 1); },
-    pause() { if (S.mode === 'play') { S.mode = 'pause'; return true; } return false; },
-    resume() { if (S.mode === 'pause') { S.mode = 'play'; input.jumpEdge = false; } },
+    pause() {
+      if (S.mode === 'play' || S.mode === 'lab') { S.pausedFrom = S.mode; S.mode = 'pause'; return true; }
+      return false;
+    },
+    resume() {
+      if (S.mode === 'pause') { S.mode = S.pausedFrom || 'play'; input.jumpEdge = false; }
+    },
+    get pausedFrom() { return S.pausedFrom; },
     toMenu() { S.mode = 'menu'; },
     setKey, setTouch, toggleLimp,
     get limp() { return S.limp; },

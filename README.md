@@ -87,6 +87,10 @@ the floor** and wander a little. Grab one with a finger or the mouse and it drop
 the spot; fling it at a surface and you get paid for the damage. Throw one **through** the others
 and they all go down like skittles.
 
+Gravity in here is dialled down to 42% — bodies hang and drift rather than dropping like stones,
+which gives you time to watch what you did. They still come down: a fall from the ceiling lands
+hard enough to pay.
+
 **Spawn** and **Clear** sit top right, clear of the floor where everything happens. Spawn tops the
 room up to fourteen; Clear wipes the bodies, the giblets and every stain. The movement controls are
 hidden in here — there is nothing to drive.

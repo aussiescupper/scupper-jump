@@ -456,6 +456,8 @@
 
   function pauseGame() {
     if (!SL.game.pause()) return;
+    const inLab = SL.game.pausedFrom === 'lab';
+    $('#btn-restart').textContent = inLab ? '↻ Reset room' : '↻ Restart level';
     SL.audio.play('back');
     $$('.screen').forEach(s => s.classList.toggle('active', s.id === 'screen-pause'));
     current = 'pause';

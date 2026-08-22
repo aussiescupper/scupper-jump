@@ -1,7 +1,7 @@
 /* Scupper Jump — wiring: canvas, input, PWA install, service worker */
 (function (SL) {
   'use strict';
-  SL.VERSION = '1.6.0';
+  SL.VERSION = '1.6.1';
 
   const canvas = document.getElementById('game');
 
@@ -62,7 +62,7 @@
       }
       if (e.code === 'Escape' || e.code === 'KeyP') {
         e.preventDefault();
-        if (SL.game.mode === 'play') SL.ui.pauseGame();
+        if (SL.game.mode === 'play' || SL.game.mode === 'lab') SL.ui.pauseGame();
         else if (SL.game.mode === 'pause') { SL.ui.hideScreens(true); SL.game.resume(); }
         else if (SL.ui.current && SL.ui.current !== 'title') SL.ui.back();
       }

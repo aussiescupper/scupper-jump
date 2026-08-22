@@ -28,6 +28,7 @@
      A plain padded cell: floor, two walls and a ceiling. Nothing to climb,
      nothing to dodge — the surfaces are the point. */
   const CEILING = 548;
+  const GRAVITY = 0.42;             // floaty, but they still come down
 
   function buildArena(S) {
     const th = LV.THEMES[4];                       // Harbour Lights: dark, reads well
@@ -37,6 +38,7 @@
     return {
       lab: true, endless: false, n: 0, W, plats, platById, coins: [], saws: [],
       ceiling: CEILING,
+      gravityMul: GRAVITY,
       theme: th, difficulty: 0, parTime: Infinity, goalY: 900, top: CEILING,
       coinCount: 0, totalCoinValue: 0, seedTag: 'lab'
     };
@@ -333,5 +335,5 @@
     ctx.globalAlpha = 1;
   }
 
-  SL.lab = { start, step, draw, grabAt, moveGrab, release, isGrabbing, clearRoom, addOne, population, POP, MAX_BODIES, CEILING };
+  SL.lab = { start, step, draw, grabAt, moveGrab, release, isGrabbing, clearRoom, addOne, population, POP, MAX_BODIES, CEILING, GRAVITY };
 })(window.SL);
