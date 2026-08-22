@@ -454,8 +454,9 @@
       drawPlatform(p, LV.platX(p, t), sy, th, t);
     }
 
-    /* blood already spilled */
+    /* blood already spilled, and everyone who died getting here */
     SL.gore.drawDecals(S, ctx, toY, t);
+    SL.gore.drawOld(S, ctx, toY, t);
 
     /* saws */
     for (const s of lv.saws) {

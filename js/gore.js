@@ -24,6 +24,7 @@
   const SPLAT_IMPACT = 620;        // a fall this hard bursts him open
   const MAX_DECALS = 460;
   const MAX_DROPS = 340;
+  const MAX_OLD = 8;                // how many previous corpses stay lying about
 
   const BLOOD = ['#c1121f', '#a4161a', '#e01e37', '#870c14'];
   const pick = (a) => a[(Math.random() * a.length) | 0];
@@ -59,7 +60,7 @@
 
   /* ---------------- setup ---------------- */
   function reset(S) {
-    S.gore = { rd: null, parts: [], ropes: [], drops: [], decals: [], t: 0 };
+    S.gore = { rd: null, parts: [], ropes: [], drops: [], decals: [], old: [], t: 0 };
   }
   function softReset(S) {          // between attempts: bodies go, the mess stays
     ensure(S);
@@ -605,6 +606,22 @@
     stepLoose(S, dt);
   }
 
+  /** Leave the body where it lies and stop simulating it, so you can climb
+      past your own previous attempts. Called on respawn. */
+  function retire(S) {
+    ensure(S);
+    const g = S.gore;
+    if (g.rd && g.rd.pts.some((p) => p.y > -40)) {
+      g.old.push({ rd: g.rd, parts: g.parts.slice(), ropes: g.ropes.slice() });
+      if (g.old.length > MAX_OLD) g.old.shift();
+    }
+    g.rd = null;
+    g.parts.length = 0;
+    g.ropes.length = 0;
+    g.drops.length = 0;
+    g.t = 0;
+  }
+
   /** Bin the body but keep the mess it made. Used when it has fallen out of sight. */
   function vanish(S) {
     ensure(S);
@@ -658,6 +675,21 @@
       }
     }
     ctx.globalAlpha = 1;
+  }
+
+  /** Everyone who came before. Frozen where they fell — drawn, never simulated. */
+  function drawOld(S, ctx, toY, time) {
+    const g = S.gore;
+    if (!g || !g.old || !g.old.length) return;
+    const h = SL.render.view.h;
+    for (const o of g.old) {
+      let top = -Infinity, low = Infinity;
+      for (const p of o.rd.pts) { if (p.y > top) top = p.y; if (p.y < low) low = p.y; }
+      if (toY(top) > h + 60 || toY(low) < -60) continue;       // off screen
+      for (const rope of o.ropes) drawGut(ctx, rope, toY);
+      for (const p of o.parts) drawOrgan(ctx, p, toY);
+      drawRagdoll(ctx, o.rd, toY, time);
+    }
   }
 
   function drawParts(S, ctx, toY, time) {
@@ -825,7 +857,7 @@
     ctx.restore();
   }
 
-  SL.gore = { reset, softReset, spawn, spawnLimp, kill, vanish, topOf, step, focus, drawDecals, drawParts, splash,
+  SL.gore = { reset, softReset, retire, spawn, spawnLimp, kill, vanish, topOf, step, focus, drawDecals, drawParts, drawOld, splash,
     /* reusable pieces, for the smash lab */
     makeRagdoll, stepBody, drawRagdoll, cut, stain, splashAt: splash, HEAD, CHEST, HIP };
 })(window.SL);

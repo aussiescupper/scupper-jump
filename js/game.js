@@ -91,7 +91,8 @@
     S.limp = false;
     S.awaitRetry = false;
     fire('retry', null);
-    SL.gore.softReset(S);
+    /* a fresh level wipes everything; a respawn leaves the last body lying there */
+    if (full) SL.gore.softReset(S); else SL.gore.retire(S);
     R.clearParts();
     if (full) { for (const c of lv.coins) c.got = false; }
   }

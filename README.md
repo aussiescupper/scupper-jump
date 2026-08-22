@@ -70,6 +70,11 @@ more than a full screen, so you always see the whole tumble — then stops, lets
 and deletes it. Without that, dying near the top of a tall endless run drags the camera a couple of
 thousand pixels and takes fifteen seconds about it. Short falls are unchanged and still land.
 
+**Your previous bodies stay where they fell.** Respawn and the last one is still lying there,
+organs and all, frozen — up to eight of them, cleared only when you leave the level. Since a corpse
+works its way to the bottom, they pile up around the spawn point, so a bad run has you standing on
+a heap of your own attempts with blood on every block you died over.
+
 A **corpse** slides off ledges and eventually slips through them, because it belongs at the
 bottom. A body you put down **on purpose** does not — it grips, settles on whatever block it lands
 on, and stays there.
