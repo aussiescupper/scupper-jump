@@ -14,7 +14,8 @@
   --bad:#ff5d6c;
   --gold:#ffd166;
   --r:16px;
-  --tap:52px;
+  --tap:clamp(58px,17vw,74px);
+  --tap-jump:clamp(76px,23.5vw,98px);
   --safe-t:env(safe-area-inset-top,0px);
   --safe-b:env(safe-area-inset-bottom,0px);
   --safe-l:env(safe-area-inset-left,0px);
@@ -59,7 +60,7 @@ body{
 #hud-level{color:var(--acc2)}
 .coin-dot{width:11px;height:11px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff3c4,var(--gold));box-shadow:0 0 6px rgba(255,209,102,.7);display:inline-block}
 .icon-btn{
-  pointer-events:auto;flex:0 0 auto;width:34px;height:34px;border-radius:11px;
+  pointer-events:auto;flex:0 0 auto;width:40px;height:40px;border-radius:13px;
   background:rgba(10,14,25,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
   border:1px solid var(--line);color:var(--txt);font-size:14px;font-weight:800;cursor:pointer;
   display:grid;place-items:center;
@@ -105,17 +106,19 @@ body{
 /* ============ touch pad ============ */
 #touch{z-index:3}
 #touch[hidden]{display:none}
-.pad{position:absolute;bottom:calc(20px + var(--safe-b));display:flex;gap:12px;align-items:flex-end}
+.pad{position:absolute;bottom:calc(22px + var(--safe-b));display:flex;gap:14px;align-items:flex-end}
 .pad-left{left:calc(18px + var(--safe-l))}
 .pad-right{right:calc(18px + var(--safe-r))}
 .tbtn{
   pointer-events:auto;width:var(--tap);height:var(--tap);border-radius:50%;
-  background:rgba(233,238,251,.09);border:1.5px solid rgba(233,238,251,.26);
-  color:rgba(233,238,251,.8);font-size:18px;line-height:1;cursor:pointer;
+  background:rgba(233,238,251,.10);border:2px solid rgba(233,238,251,.28);
+  color:rgba(233,238,251,.85);font-size:calc(var(--tap) * .34);line-height:1;cursor:pointer;
+  display:grid;place-items:center;padding:0;
   transition:transform .06s,background .1s;
 }
 .tbtn.on{background:rgba(61,220,151,.35);border-color:var(--acc2);transform:scale(.93)}
-.tbtn-jump{width:70px;height:70px;font-size:23px;background:rgba(255,176,55,.13);border-color:rgba(255,176,55,.38)}
+.tbtn-jump{width:var(--tap-jump);height:var(--tap-jump);font-size:calc(var(--tap-jump) * .3);
+  background:rgba(255,176,55,.15);border-color:rgba(255,176,55,.42)}
 .tbtn-jump.on{background:rgba(255,176,55,.42);border-color:var(--acc)}
 
 /* ============ screens ============ */
@@ -167,14 +170,14 @@ h2.centre{text-align:center;margin:0;font-size:22px;font-weight:800}
 .wallet-sm{padding:6px 11px;font-size:13px;border-radius:11px}
 
 /* buttons */
-.menu{display:flex;flex-direction:column;gap:10px}
+.menu{display:flex;flex-direction:column;gap:11px}
 .menu-row{display:flex;gap:10px}
 .menu-row>.btn{flex:1}
 .btn{
   appearance:none;border:1px solid var(--line2);background:rgba(255,255,255,.06);
-  color:var(--txt);border-radius:14px;padding:14px 16px;font-size:15px;font-weight:800;
+  color:var(--txt);border-radius:15px;padding:16px 18px;font-size:16.5px;font-weight:800;
   cursor:pointer;font-family:inherit;transition:transform .06s,background .12s,border-color .12s;
-  display:flex;align-items:center;justify-content:center;gap:8px;min-height:50px;
+  display:flex;align-items:center;justify-content:center;gap:8px;min-height:58px;
 }
 .btn:hover{background:rgba(255,255,255,.11)}
 .btn:active{transform:scale(.975)}
@@ -190,7 +193,7 @@ h2.centre{text-align:center;margin:0;font-size:22px;font-weight:800}
 .hint{margin:0;text-align:center;font-size:11.5px;color:var(--txt-dim)}
 
 /* ============ levels ============ */
-.level-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:9px}
+.level-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:10px}
 .lvl{
   position:relative;aspect-ratio:1;border-radius:14px;border:1px solid var(--line2);
   background:rgba(255,255,255,.05);color:var(--txt);cursor:pointer;font-family:inherit;
@@ -211,7 +214,7 @@ h2.centre{text-align:center;margin:0;font-size:22px;font-weight:800}
 .tabs{display:flex;gap:6px;background:rgba(0,0,0,.28);padding:5px;border-radius:14px}
 .tab{
   flex:1;border:0;background:transparent;color:var(--txt-dim);font-family:inherit;font-weight:800;
-  font-size:13.5px;padding:9px;border-radius:10px;cursor:pointer;transition:.12s;
+  font-size:14px;padding:12px 9px;border-radius:11px;cursor:pointer;transition:.12s;
 }
 .tab.active{background:rgba(255,255,255,.11);color:var(--txt)}
 .shop-grid{display:flex;flex-direction:column;gap:9px}
@@ -237,8 +240,8 @@ h2.centre{text-align:center;margin:0;font-size:22px;font-weight:800}
 .card-act{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
 .buy{
   border:1px solid var(--line2);background:rgba(255,209,102,.13);color:var(--gold);
-  border-radius:11px;padding:9px 11px;font-family:inherit;font-weight:900;font-size:13px;cursor:pointer;
-  white-space:nowrap;min-width:66px;text-align:center;transition:transform .06s;
+  border-radius:12px;padding:12px 13px;font-family:inherit;font-weight:900;font-size:13.5px;cursor:pointer;
+  white-space:nowrap;min-width:78px;min-height:44px;text-align:center;transition:transform .06s;
 }
 .buy:active{transform:scale(.95)}
 .buy.own{background:rgba(255,255,255,.07);color:var(--txt-dim);border-color:var(--line)}
@@ -249,14 +252,14 @@ h2.centre{text-align:center;margin:0;font-size:22px;font-weight:800}
 
 /* ============ settings / howto ============ */
 .rows{display:flex;flex-direction:column;gap:2px;background:rgba(0,0,0,.22);border-radius:14px;padding:4px}
-.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 12px;border-radius:11px;font-size:14.5px;font-weight:600;cursor:pointer}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 12px;border-radius:11px;font-size:15px;font-weight:600;cursor:pointer}
 .row:hover{background:rgba(255,255,255,.04)}
 .row.static{cursor:default}
 .row.static b{color:var(--txt-dim);font-weight:700;font-size:12.5px}
-.row input[type=checkbox]{appearance:none;width:46px;height:27px;border-radius:99px;background:rgba(255,255,255,.13);position:relative;cursor:pointer;transition:.16s;flex:0 0 auto;border:1px solid var(--line)}
-.row input[type=checkbox]::after{content:"";position:absolute;top:3px;left:3px;width:19px;height:19px;border-radius:50%;background:#fff;transition:.16s}
+.row input[type=checkbox]{appearance:none;width:52px;height:31px;border-radius:99px;background:rgba(255,255,255,.13);position:relative;cursor:pointer;transition:.16s;flex:0 0 auto;border:1px solid var(--line)}
+.row input[type=checkbox]::after{content:"";position:absolute;top:3px;left:3px;width:23px;height:23px;border-radius:50%;background:#fff;transition:.16s}
 .row input[type=checkbox]:checked{background:var(--acc2);border-color:transparent}
-.row input[type=checkbox]:checked::after{transform:translateX(19px)}
+.row input[type=checkbox]:checked::after{transform:translateX(21px)}
 .howto{font-size:13.5px;line-height:1.55;color:#c7d1e8;display:flex;flex-direction:column;gap:10px}
 .howto p{margin:0}
 .howto b{color:var(--txt)}
