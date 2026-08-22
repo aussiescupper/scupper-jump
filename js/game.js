@@ -16,6 +16,8 @@
   const COYOTE = 0.10, BUFFER = 0.13;
   const MAX_FALL = 1250;
   const MIN_JUMP_V = 505;          // a tap still clears the smallest gap in the tower
+  const TRIP_SPEED = 980;          // landing faster than this and his legs go out from under him
+  const TRIP_TIME = 0.8;
   const CRUMBLE_TIME = 0.42;
   const CRUMBLE_REGEN = 3.0;       // a collapsed block rebuilds, so a missed jump can never strand you
   const BOUNCE_MUL = 1.62;
@@ -29,12 +31,12 @@
     time: 0, camY: MIN_CAM, baseCam: MIN_CAM, anchor: 0, followGap: 260,
     player: null, mods: null,
     run: null,               // per-attempt bookkeeping
-    shield: false, checkpoint: null,
+    shield: false, checkpoint: null, limp: false,
     awaitRetry: false, deathCause: null,
     hudDirty: true
   };
 
-  const listeners = { hud: [], complete: [], toast: [], retry: [] };
+  const listeners = { hud: [], complete: [], toast: [], retry: [], limp: [] };
   const on = (k, fn) => listeners[k].push(fn);
   const fire = (k, p) => listeners[k].forEach(fn => fn(p));
 
@@ -43,7 +45,7 @@
     return {
       x, y, w: PW, h: PH, vx: 0, vy: 0,
       onGround: false, coyote: 0, buffer: 0, jumpsLeft: 0, cutJump: false,
-      facing: 1, pose: 'idle', animPhase: 0, squash: 1,
+      facing: 1, pose: 'idle', animPhase: 0, squash: 1, tripT: 0, rot: 0,
       trail: [], trailT: 0,
       dead: false, deadT: 0, invuln: 0, ride: null, wallDir: 0
     };
@@ -82,6 +84,7 @@
     S.baseCam = Math.max(MIN_CAM, S.anchor - S.followGap);
     S.camY = S.baseCam;
     S.shield = S.mods.shield;
+    S.limp = false;
     S.awaitRetry = false;
     fire('retry', null);
     SL.gore.softReset(S);
@@ -147,6 +150,24 @@
       }
     }
 
+    /* Gone limp on purpose: the ragdoll is the player until he gets up. */
+    if (S.limp) {
+      if (S.mode === 'play' && S.run.started) S.run.elapsed += dt;
+      SL.gore.step(S, dt);
+      const want = clamp(SL.gore.focus(S) - R.view.h * 0.42, MIN_CAM, 1e9);
+      S.camY = damp(S.camY, want, 4.5, dt);
+      let lowest = Infinity;
+      const rd = S.gore.rd;
+      if (rd) for (const q of rd.pts) if (q.y < lowest) lowest = q.y;
+      if (lowest < S.baseCam - 34) {          // flopped into the killing floor
+        S.limp = false;
+        syncFromRagdoll();
+        SL.gore.kill(S);
+        die('fell', null, true);
+      }
+      return;
+    }
+
     if (pl.dead) {
       pl.deadT += dt;
       SL.gore.step(S, dt);
@@ -164,7 +185,8 @@
     if (S.mode === 'play' && S.run.started) S.run.elapsed += dt;
     if (pl.invuln > 0) pl.invuln -= dt;
 
-    const active = S.mode === 'play';
+    if (pl.tripT > 0) pl.tripT = Math.max(0, pl.tripT - dt);
+    const active = S.mode === 'play' && pl.tripT <= 0;
     const dirX = active ? ((input.right ? 1 : 0) - (input.left ? 1 : 0)) : 0;
 
     /* -------- horizontal -------- */
@@ -179,7 +201,7 @@
       pl.facing = dirX;
     } else {
       const s = Math.sign(pl.vx);
-      pl.vx -= s * fric * dt;
+      pl.vx -= s * (pl.tripT > 0 ? fric * 1.6 : fric) * dt;
       if (Math.sign(pl.vx) !== s) pl.vx = 0;
     }
 
@@ -262,6 +284,8 @@
           best.compress = 1;
           pl.vy = BASE.jump * S.mods.jumpMul * BOUNCE_MUL;
           pl.onGround = false; pl.ride = null; pl.squash = 1.35;
+          /* a bouncer is not a jump — the release-early cut must not steal it */
+          pl.cutJump = true;
           SL.audio.play('spring');
           R.burst(pl.hx || (best.x + best.w / 2), best.y, 14, { c: '#3ddc97', dir: -Math.PI / 2, spread: 1.4, speed: 190, g: 380, r: 3, life: 0.5 });
         } else if (best.type === 'goal') {
@@ -270,6 +294,16 @@
           if (!wasGround && impact > 120) {
             pl.squash = clamp(1 - impact / 3400, 0.62, 0.95);
             SL.audio.play('land');
+            /* come down hard enough and his legs go out from under him */
+            const tripAt = TRIP_SPEED * (1 + SL.save.tier('grip') * 0.18);
+            if (impact > tripAt && best.type !== 'ice') {
+              pl.tripT = TRIP_TIME;
+              pl.buffer = 0;
+              SL.audio.play('squelch');
+              SL.util.vibrate(SL.save.data.settings.haptic ? [12, 30, 12] : 0);
+              R.burst(pl.x + PW / 2, pl.y, 9, { c: 'rgba(255,255,255,.5)', dir: -Math.PI / 2, spread: 2.8, speed: 110, g: 420, r: 2.6, life: 0.4 });
+              fire('toast', 'Tripped!');
+            }
             if (impact > 380) {
               R.burst(pl.x + PW / 2, pl.y, 7, { c: 'rgba(255,255,255,.55)', dir: -Math.PI / 2, spread: 2.6, speed: 90, g: 400, r: 2.4, life: 0.35 });
               SL.util.vibrate(SL.save.data.settings.haptic ? 8 : 0);
@@ -358,9 +392,15 @@
 
     /* -------- animation -------- */
     pl.squash = damp(pl.squash, 1, 13, dt);
-    if (!pl.onGround) pl.pose = pl.vy > 40 ? 'jump' : 'fall';
-    else if (Math.abs(pl.vx) > 22) { pl.pose = 'run'; pl.animPhase += Math.abs(pl.vx) * dt * 0.075; }
-    else { pl.pose = 'idle'; pl.animPhase += dt * 2.2; }
+    if (pl.tripT > 0) {
+      pl.pose = 'trip';
+      const p = 1 - pl.tripT / TRIP_TIME;                 // 0 just fallen -> 1 back up
+      const amt = p < 0.22 ? p / 0.22 : (p < 0.68 ? 1 : 1 - (p - 0.68) / 0.32);
+      pl.rot = -pl.facing * 1.25 * clamp(amt, 0, 1);
+      pl.animPhase += dt * 3;
+    } else if (!pl.onGround) { pl.rot = 0; pl.pose = pl.vy > 40 ? 'jump' : 'fall'; }
+    else if (Math.abs(pl.vx) > 22) { pl.rot = 0; pl.pose = 'run'; pl.animPhase += Math.abs(pl.vx) * dt * 0.075; }
+    else { pl.rot = 0; pl.pose = 'idle'; pl.animPhase += dt * 2.2; }
 
     pl.trailT += dt;
     if (pl.trailT > 0.035) {
@@ -395,7 +435,7 @@
     die(cause || 'spike', cutY);
   }
 
-  function die(cause, cutY) {
+  function die(cause, cutY, keepRagdoll) {
     const pl = S.player;
     if (pl.dead) return;
     pl.dead = true; pl.deadT = 0;
@@ -408,8 +448,38 @@
     S.run.deaths++;
     SL.save.bump('deaths');
     SL.util.vibrate(SL.save.data.settings.haptic ? [30, 50, 30, 50, 70] : 0);
-    SL.gore.spawn(S, cause, S.cutY);
+    if (!keepRagdoll) SL.gore.spawn(S, cause, S.cutY);
     S.hudDirty = true;
+  }
+
+  /* put the player back where the ragdoll ended up */
+  function syncFromRagdoll() {
+    const rd = S.gore && S.gore.rd;
+    if (!rd) return;
+    let lowest = Infinity;
+    for (const q of rd.pts) lowest = Math.min(lowest, q.y - q.r);
+    S.player.x = clamp(rd.pts[2].x - PW / 2, 0, W - PW);
+    S.player.y = Math.max(lowest, 0);
+    S.player.vx = 0; S.player.vy = 0;
+    S.player.onGround = false;
+    S.player.tripT = 0; S.player.rot = 0;
+  }
+
+  function toggleLimp() {
+    if (S.mode !== 'play' || S.player.dead) return false;
+    if (S.limp) {
+      S.limp = false;
+      syncFromRagdoll();
+      SL.gore.softReset(S);
+      S.player.tripT = TRIP_TIME * 0.45;      // a moment to find his feet
+      SL.audio.play('land');
+    } else {
+      S.limp = true;
+      SL.gore.spawnLimp(S);
+      SL.audio.play('squelch');
+    }
+    fire('limp', S.limp);
+    return true;
   }
 
   function respawn() {
@@ -546,7 +616,8 @@
     pause() { if (S.mode === 'play') { S.mode = 'pause'; return true; } return false; },
     resume() { if (S.mode === 'pause') { S.mode = 'play'; input.jumpEdge = false; } },
     toMenu() { S.mode = 'menu'; },
-    setKey, setTouch,
+    setKey, setTouch, toggleLimp,
+    get limp() { return S.limp; },
     /* headless single step — used by the playtest bot and by tests, not by the loop */
     tick(dt) { if (S.level) step(dt); },
     get mode() { return S.mode; },

@@ -11,7 +11,7 @@
     equip: { skin: 'skin_classic', hat: 'hat_none' },
     progress: {},          // levelNumber -> {t:bestTime, d:bestDeaths, c:bestCoins, s:stars}
     stats: { runs: 0, deaths: 0, jumps: 0, coins: 0, earned: 0, playtime: 0 },
-    settings: { sfx: true, music: false, haptic: true, lowfx: false, forceTouch: false, gore: true },
+    settings: { sfx: true, music: false, haptic: true, lowfx: false, forceTouch: false, gore: true, blood: true },
     seen: { howto: false }
   });
 

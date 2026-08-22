@@ -424,14 +424,14 @@
     }
     ctx.globalAlpha = 1;
 
-    /* the remains */
-    if (S.player.dead) SL.gore.drawParts(S, ctx, toY, t);
+    /* the remains — or a body that has gone limp on purpose */
+    if (S.player.dead || S.limp) SL.gore.drawParts(S, ctx, toY, t);
 
     /* player (with trail for the fancier skins) */
     const pl = S.player;
     const skin = SL.items.byId[SL.save.equipped('skin')];
     const fx = skin ? skin.fx : null;
-    if (!pl.dead && (fx === 'ghost' || fx === 'glow' || fx === 'rainbow') && !SL.save.data.settings.lowfx) {
+    if (!pl.dead && !S.limp && (fx === 'ghost' || fx === 'glow' || fx === 'rainbow') && !SL.save.data.settings.lowfx) {
       for (let i = 0; i < pl.trail.length; i++) {
         const tr = pl.trail[i];
         const a = (i / pl.trail.length) * 0.34;
@@ -441,18 +441,18 @@
         ctx.restore();
       }
     }
-    if (!pl.dead) {
+    if (!pl.dead && !S.limp) {
       ctx.save();
       ctx.translate(pl.x + pl.w / 2, toY(pl.y));
       SL.stick.draw(ctx, {
         skin: SL.save.equipped('skin'), hat: SL.save.equipped('hat'),
-        pose: pl.pose, phase: pl.animPhase, facing: pl.facing, t, squash: pl.squash
+        pose: pl.pose, phase: pl.animPhase, facing: pl.facing, t, squash: pl.squash, rot: pl.rot
       });
       ctx.restore();
     }
 
     /* shield bubble */
-    if (S.shield && !pl.dead) {
+    if (S.shield && !pl.dead && !S.limp) {
       ctx.save();
       ctx.strokeStyle = 'rgba(92,255,193,' + (0.5 + 0.25 * Math.sin(t * 5)) + ')';
       ctx.lineWidth = 2;

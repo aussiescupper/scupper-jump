@@ -8,6 +8,7 @@
   const stack = [];
   let current = 'title';
   let shopTab = 'upgrade';
+  let settingsTab = 'game';
 
   /* ---------------- screens ---------------- */
   function show(name, push) {
@@ -206,16 +207,51 @@
   }
 
   /* ---------------- settings ---------------- */
+  function setTab(name) {
+    settingsTab = name;
+    $$('#settings-tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.stab === name));
+    $$('.stab').forEach(p => { p.hidden = p.dataset.stab !== name; });
+  }
+
   function renderSettings() {
-    const map = { 'set-sfx': 'sfx', 'set-music': 'music', 'set-haptic': 'haptic', 'set-gore': 'gore', 'set-lowfx': 'lowfx', 'set-touch': 'forceTouch' };
+    const map = { 'set-sfx': 'sfx', 'set-music': 'music', 'set-haptic': 'haptic', 'set-gore': 'gore', 'set-blood': 'blood', 'set-lowfx': 'lowfx', 'set-touch': 'forceTouch' };
     Object.keys(map).forEach(id => {
       const n = document.getElementById(id);
       if (n) n.checked = !!SL.save.setting(map[id]);
     });
+    setTab(settingsTab);
     $('#set-version').textContent = SL.VERSION || '1.0.0';
   }
 
   /* ---------------- HUD ---------------- */
+  function paintRagdollBtn(limp) {
+    const btn = document.getElementById('btn-ragdoll');
+    btn.classList.toggle('on', !!limp);
+    btn.setAttribute('aria-label', limp ? 'Get up (R)' : 'Go limp (R)');
+    const c = btn.querySelector('canvas');
+    const size = 38, dpr = Math.min(2, window.devicePixelRatio || 1);
+    c.width = size * dpr; c.height = size * dpr;
+    const x = c.getContext('2d');
+    x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    x.clearRect(0, 0, size, size);
+    x.save();
+    /* standing when he can flop, flat on his back once he has */
+    if (limp) {
+      x.translate(size * 0.86, size * 0.68);
+      x.rotate(-Math.PI / 2);
+      x.scale(0.82, 0.82);
+    } else {
+      x.translate(size / 2, size - 3);
+      x.scale(0.95, 0.95);
+    }
+    SL.stick.draw(x, {
+      skin: SL.save.equipped('skin'), hat: null,
+      pose: limp ? 'fall' : 'idle', phase: 1.1, facing: 1, t: 0.4,
+      colour: limp ? '#ffb037' : 'rgba(233,238,251,.9)'
+    });
+    x.restore();
+  }
+
   function bindHud() {
     SL.game.on('hud', (h) => {
       const lvl = $('#hud-level');
@@ -234,6 +270,8 @@
     });
     SL.game.on('complete', showComplete);
     SL.game.on('retry', showRetry);
+    SL.game.on('limp', paintRagdollBtn);
+    paintRagdollBtn(false);
   }
 
   /* ---------------- death prompt ---------------- */
@@ -313,6 +351,14 @@
     $$('#shop-tabs .tab').forEach(t => t.addEventListener('click', () => {
       shopTab = t.dataset.tab; SL.audio.play('ui'); renderShop();
     }));
+    $$('#settings-tabs .tab').forEach(t => t.addEventListener('click', () => {
+      SL.audio.play('ui'); setTab(t.dataset.stab);
+    }));
+    document.getElementById('btn-ragdoll').addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      SL.audio.unlock();
+      SL.game.toggleLimp();
+    });
 
     $('#btn-pause').addEventListener('click', () => pauseGame());
     $('#btn-resume').addEventListener('click', () => { SL.audio.play('ui'); hideScreens(true); SL.game.resume(); });
@@ -324,7 +370,7 @@
     $('#btn-cmp-shop').addEventListener('click', () => { SL.audio.play('ui'); stack.length = 0; stack.push('title'); show('shop', false); });
     $('#btn-cmp-menu').addEventListener('click', () => { SL.audio.play('back'); SL.game.showcase(SL.save.data.unlocked); show('title', false); });
 
-    const map = { 'set-sfx': 'sfx', 'set-music': 'music', 'set-haptic': 'haptic', 'set-gore': 'gore', 'set-lowfx': 'lowfx', 'set-touch': 'forceTouch' };
+    const map = { 'set-sfx': 'sfx', 'set-music': 'music', 'set-haptic': 'haptic', 'set-gore': 'gore', 'set-blood': 'blood', 'set-lowfx': 'lowfx', 'set-touch': 'forceTouch' };
     Object.keys(map).forEach(id => {
       const n = document.getElementById(id);
       if (!n) return;
@@ -354,5 +400,5 @@
     document.getElementById('touch').hidden = true;
   }
 
-  SL.ui = { show, hideScreens, back, bind, bindHud, walletAll, pauseGame, noteTouch, touchWanted, showRetry, get current() { return current; } };
+  SL.ui = { show, hideScreens, back, bind, bindHud, walletAll, pauseGame, noteTouch, touchWanted, showRetry, paintRagdollBtn, get current() { return current; } };
 })(window.SL);

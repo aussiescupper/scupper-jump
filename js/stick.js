@@ -38,6 +38,14 @@
         lean: -f * 0.8
       };
     }
+    if (pose === 'trip') {
+      /* sprawled forward, hands out to break the fall */
+      return {
+        legs: [[f * -3.5, HIP + 4, f * -7.5, HIP + 7], [f * -4.5, HIP + 6, f * -8.5, HIP + 10]],
+        arms: [[f * 6.5, SHOULDER + 1, f * 10, SHOULDER + 4], [f * 6, SHOULDER + 4, f * 9.5, SHOULDER + 7]],
+        lean: f * 2.4
+      };
+    }
     if (pose === 'run') {
       const s = Math.sin(phase), c = Math.cos(phase);
       return {
@@ -144,6 +152,7 @@
     const p = poseOf(o.pose || 'idle', o.phase || 0, facing);
 
     ctx.save();
+    if (o.rot) ctx.rotate(o.rot);                 // used when he trips over
     if (o.squash && o.squash !== 1) {
       ctx.scale(2 - o.squash, o.squash);          // volume-ish preserving squash about the feet
     }

@@ -33,6 +33,7 @@
       <div class="climb-flag">⚑</div>
     </div>
     <div id="toast-layer"></div>
+    <button id="btn-ragdoll" aria-label="Go limp (R)"><canvas></canvas></button>
     <div id="retry" hidden>
       <div class="retry-card">
         <b id="retry-title">Splat.</b>
@@ -120,13 +121,23 @@
           <button class="icon-btn back" data-back>←</button>
           <h2>Settings</h2>
         </header>
-        <div class="rows">
-          <label class="row"><span>Sound effects</span><input type="checkbox" id="set-sfx"></label>
-          <label class="row"><span>Music</span><input type="checkbox" id="set-music"></label>
+        <div class="tabs" id="settings-tabs">
+          <button class="tab active" data-stab="game">Game</button>
+          <button class="tab" data-stab="gore">Gore</button>
+          <button class="tab" data-stab="sound">Sound</button>
+        </div>
+        <div class="rows stab" data-stab="game">
           <label class="row"><span>Vibration</span><input type="checkbox" id="set-haptic"></label>
-          <label class="row"><span>Blood &amp; guts</span><input type="checkbox" id="set-gore"></label>
           <label class="row"><span>Reduced effects</span><input type="checkbox" id="set-lowfx"></label>
           <label class="row"><span>Always show touch pad</span><input type="checkbox" id="set-touch"></label>
+        </div>
+        <div class="rows stab" data-stab="gore" hidden>
+          <label class="row"><span>Blood<i>Spray, drips and stains</i></span><input type="checkbox" id="set-blood"></label>
+          <label class="row"><span>Dismemberment<i>Coming apart where you get hit</i></span><input type="checkbox" id="set-gore"></label>
+        </div>
+        <div class="rows stab" data-stab="sound" hidden>
+          <label class="row"><span>Sound effects</span><input type="checkbox" id="set-sfx"></label>
+          <label class="row"><span>Music</span><input type="checkbox" id="set-music"></label>
         </div>
         <div class="rows">
           <div class="row static"><span>Version</span><b id="set-version">—</b></div>
@@ -155,6 +166,8 @@
             <li><i class="sw bouncy"></i>Bouncer — flings you way up.</li>
             <li><i class="sw spike"></i>Spikes &amp; sawblades — they cut through whatever they touch.</li>
           </ul>
+          <p><b>Go limp.</b> Press <kbd>R</kbd> or tap the stickman button at the bottom of the screen and he drops into a ragdoll wherever he is. Press it again to get back up. Flop into the red floor while limp and it counts as a death.</p>
+          <p><b>Mind the drop.</b> Land from too great a height and he trips over — no control for a moment while he picks himself up, which is plenty of time to slide off a ledge. Grip Gloves let you take a harder landing before it happens.</p>
           <p><b>When it goes wrong.</b> The stickman is a ragdoll, and he comes apart <em>where the blade went through</em> — land on spikes and you lose your legs, walk into a sawblade at head height and you lose your head. Whatever is left flops all the way down the tower, painting the blocks on the way. It will not tidy itself up — tap, click or press a key when you have seen enough. Squeamish? Turn <b>Blood &amp; guts</b> off in Settings.</p>
           <p><b>Stick Credits.</b> Collect coins, clear levels fast and death-free, then spend the lot in the Shop on gear, skins and hats. Replaying a cleared level pays 30%.</p>
         </div>

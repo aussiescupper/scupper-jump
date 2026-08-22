@@ -22,6 +22,18 @@ lethal floor climbing up behind you.
   dying. Replaying a cleared level pays 30%.
 * **Stars** — ★ clear it · ★★ clear it without dying · ★★★ and collect every coin.
 
+### Going limp, and tripping over
+
+Press <kbd>R</kbd> (or the button between the two thumb pads) and he drops into a ragdoll on the
+spot. Press again and he picks himself up wherever he landed — which is not always where he
+started, since a limp body slides. A live ragdoll never bleeds and never comes apart. Flop into
+the red floor while limp and it counts as a death like any other.
+
+Land from more than about 240px — roughly two platform gaps — and he **trips**, sprawling forward
+with no control for 0.8 s while he gets back up. Long enough to slide off a narrow ledge. A normal
+jump peaks at 139px so routine climbing never triggers it (measured across eight bot-completed
+levels: zero trips). Grip Gloves raise the threshold by 18% per tier.
+
 ### Dying
 
 The stickman is a **Verlet ragdoll** — eleven points (head, chest, hip, elbows, hands, knees,
@@ -49,9 +61,16 @@ tumbles the whole way down the tower, spraying blood and leaving **permanent sta
 surface it touches. The mess stays for the rest of your attempt; it is only cleared when you leave
 the level.
 
-**Nothing stops it on its own.** The ragdoll runs until you tap, click or press a key. Anyone who
-would rather not watch can turn **Blood & guts** off in Settings — he still ragdolls, but stays in
-one piece with no blood, and the click-to-continue behaviour is unchanged.
+**Nothing stops it on its own.** The ragdoll runs until you tap, click or press a key.
+
+Settings has a **Gore** tab with two independent switches:
+
+| Blood | Dismemberment | Result |
+|---|---|---|
+| on | on | the lot |
+| off | on | comes apart, entirely bloodless |
+| on | off | stays whole, bleeds where he lands |
+| off | off | a clean ragdoll |
 
 ### Blocks and hazards
 
@@ -91,9 +110,11 @@ renderer that draws the stickman in game.
 |---|---|
 | Move | <kbd>A</kbd>/<kbd>D</kbd> or <kbd>←</kbd>/<kbd>→</kbd> |
 | Jump | <kbd>Space</kbd>, <kbd>W</kbd> or <kbd>↑</kbd> — **hold for a higher jump** |
+| Go limp / get up | <kbd>R</kbd>, or the stickman button at the bottom of the screen |
 | Pause | <kbd>Esc</kbd> or <kbd>P</kbd> |
-| Restart level | <kbd>R</kbd> |
 | Mute | <kbd>M</kbd> |
+
+Restarting a level lives in the pause menu — <kbd>R</kbd> is the ragdoll toggle.
 
 On a touch device an on-screen pad appears automatically. Gamepads work too (left stick / d-pad
 and the bottom face button).

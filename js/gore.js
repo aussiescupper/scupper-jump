@@ -68,12 +68,16 @@
   function ensure(S) { if (!S.gore) reset(S); }
 
   const lowfx = () => SL.save.data.settings.lowfx;
-  const goreOn = () => SL.save.data.settings.gore !== false;
+  const cutsOn = () => SL.save.data.settings.gore !== false;      // dismemberment
+  const bloodOn = () => SL.save.data.settings.blood !== false;    // blood + stains
+  /* a ragdoll you asked for (R) is alive: it never bleeds and never comes apart */
+  const bleeds = (S) => bloodOn() && S.gore.rd && !S.gore.rd.alive;
   const scale = (n) => Math.max(2, Math.round(n * (lowfx() ? 0.35 : 1)));
 
   /* ---------------- spawning ---------------- */
   /** cutY is a world height — wherever the blade went through. null means intact. */
-  function spawn(S, cause, cutY) {
+  function spawn(S, cause, cutY, opts) {
+    opts = opts || {};
     ensure(S);
     const g = S.gore;
     const pl = S.player;
@@ -106,16 +110,36 @@
       pts, bones, colour,
       hat: SL.save.equipped('hat'),
       headRot: 0, headSpin: 0,
-      burst: false, asleep: false
+      burst: false, asleep: false,
+      alive: !!opts.alive
     };
     g.rd = rd;
 
-    if (goreOn() && cutY != null) {
+    if (rd.alive) return rd;                       // voluntary flop: no cut, no blood, no noise
+    if (cutsOn() && cutY != null) {
       cut(S, rd, cutY, cause === 'saw' ? 1.25 : 1);
     } else {
       SL.audio.play('die');
     }
     return rd;
+  }
+
+  /* Go limp on purpose. Same ragdoll, just not a corpse. */
+  function spawnLimp(S) {
+    const rd = spawn(S, 'limp', null, { alive: true });
+    for (const p of rd.pts) {                      // a little slump so it reads as going limp
+      p.px = p.x - ((p.x - p.px) * 0.6);
+      p.py = p.y - ((p.y - p.py) * 0.6) - 0.02;
+    }
+    return rd;
+  }
+
+  /* A limp ragdoll that hits the killing floor becomes a corpse where it lies. */
+  function kill(S) {
+    const rd = S.gore && S.gore.rd;
+    if (!rd || !rd.alive) return;
+    rd.alive = false;
+    SL.audio.play('die');
   }
 
   /** Sever every bone that crosses the plane, then shove the two sides apart. */
@@ -136,6 +160,7 @@
       }
     }
     if (!severed) { SL.audio.play('die'); return; }   // blade missed every limb
+    const wet = bloodOn();
 
     /* the two sides go opposite ways */
     const away = Math.random() < 0.5 ? -1 : 1;
@@ -148,9 +173,11 @@
       p.py = p.y - vy * dt;
     }
 
-    spillOrgans(S, rd, cutY, force);
-    splash(S, avgX(pts), cutY, scale(70), 300, -0.2);
-    SL.audio.play('splat');
+    if (wet) {
+      spillOrgans(S, rd, cutY, force);
+      splash(S, avgX(pts), cutY, scale(70), 300, -0.2);
+      SL.audio.play('splat');
+    }
     SL.audio.play('die');
   }
 
@@ -253,7 +280,7 @@
       rd.headRot += rd.headSpin;
     }
 
-    if (goreOn()) bleedFromCuts(S, rd, dt);
+    if (bleeds(S)) bleedFromCuts(S, rd, dt);
 
     /* once everything has stopped on the floor, stop simulating */
     let moving = false;
@@ -326,10 +353,10 @@
   }
 
   function onImpact(S, p, impact, plat) {
-    if (!goreOn()) return;
     const rd = S.gore.rd;
+    if (!rd || rd.alive) return;                   // a live ragdoll just thumps
     /* a hard enough landing bursts an intact body open */
-    if (rd && !rd.burst && impact > SPLAT_IMPACT) {
+    if (cutsOn() && !rd.burst && impact > SPLAT_IMPACT) {
       const intact = rd.bones.some(b => b.stiff === 1 && !b.dead);
       const anyCut = rd.pts.some(q => q.cut);
       if (intact && !anyCut) {
@@ -339,6 +366,7 @@
         return;
       }
     }
+    if (!bloodOn()) return;
     const amt = clamp(impact / 700, 0.25, 1.4);
     if (p.cut || impact > 320) {
       splash(S, p.x, p.y - p.r, scale(Math.round(3 + amt * 11)), 130 * amt, 0.35);
@@ -399,7 +427,7 @@
         if (impact > 42) {
           p.vy = impact * 0.42; p.vx *= 0.8;
           p.vrot = p.vrot * 0.7 + p.vx * 0.05;
-          if (goreOn()) stain(S, p.x, landed.y, p.r * 0.9, landed);
+          if (bloodOn()) stain(S, p.x, landed.y, p.r * 0.9, landed);
           if (p.vy < 26) p.vy = 0;
         } else p.vy = 0;
       } else if (p.y - p.r <= 0 && p.vy <= 0) {
@@ -408,7 +436,7 @@
         p.onPlat = 'ground';
         if (impact > 42) {
           p.vy = impact * 0.34; p.vx *= 0.72;
-          if (goreOn()) stain(S, p.x, 0.5, p.r * 0.9, null);
+          if (bloodOn()) stain(S, p.x, 0.5, p.r * 0.9, null);
           if (p.vy < 22) p.vy = 0;
         } else p.vy = 0;
       }
@@ -647,5 +675,5 @@
     ctx.restore();
   }
 
-  SL.gore = { reset, softReset, spawn, step, focus, drawDecals, drawParts, splash };
+  SL.gore = { reset, softReset, spawn, spawnLimp, kill, step, focus, drawDecals, drawParts, splash };
 })(window.SL);
