@@ -78,25 +78,15 @@
 
   /* ---------------- spawning ---------------- */
   /** cutY is a world height — wherever the blade went through. null means intact. */
-  function spawn(S, cause, cutY, opts) {
-    opts = opts || {};
-    ensure(S);
-    const g = S.gore;
-    const pl = S.player;
-    g.parts.length = 0;
-    g.t = 0;
-
-    const cx = pl.x + pl.w / 2;
-    const base = pl.y;
-    const colour = SL.stick.skinColour(SL.save.equipped('skin'), S.time);
+  /** Build a ragdoll standing with its feet at (cx, feetY). o: {vx, vy, colour, hat, alive} */
+  function makeRagdoll(cx, feetY, o) {
+    o = o || {};
     const dt = 1 / 120;
-
     const pts = SKELETON.map((s) => {
       const x = cx + s.x + rnd(-0.4, 0.4);
-      const y = base + s.y;
-      /* inherit the player's motion, plus a little life of its own */
-      const vx = pl.vx * 0.6 + rnd(-40, 40);
-      const vy = pl.vy * 0.35 + rnd(-30, 60);
+      const y = feetY + s.y;
+      const vx = (o.vx || 0) + rnd(-40, 40);
+      const vy = (o.vy || 0) + rnd(-30, 60);
       return {
         x, y, px: x - vx * dt, py: y - vy * dt, r: s.r, n: s.n,
         cut: false, stuckT: 0, noClip: 0, contact: false, dripT: rnd(0, 0.1)
@@ -107,14 +97,31 @@
       len: Math.hypot(SKELETON[a].x - SKELETON[b].x, SKELETON[a].y - SKELETON[b].y),
       dead: false
     }));
-
-    const rd = {
-      pts, bones, colour,
-      hat: SL.save.equipped('hat'),
+    return {
+      pts, bones,
+      colour: o.colour || '#e9eefb',
+      hat: o.hat || null,
       headRot: 0, headSpin: 0,
       burst: false, asleep: false,
-      alive: !!opts.alive
+      alive: !!o.alive,
+      onSmash: null
     };
+  }
+
+  function spawn(S, cause, cutY, opts) {
+    opts = opts || {};
+    ensure(S);
+    const g = S.gore;
+    const pl = S.player;
+    g.parts.length = 0;
+    g.t = 0;
+
+    const rd = makeRagdoll(pl.x + pl.w / 2, pl.y, {
+      vx: pl.vx * 0.6, vy: pl.vy * 0.35,
+      colour: SL.stick.skinColour(SL.save.equipped('skin'), S.time),
+      hat: SL.save.equipped('hat'),
+      alive: !!opts.alive
+    });
     g.rd = rd;
 
     if (rd.alive) return rd;                       // voluntary flop: no cut, no blood, no noise
@@ -252,24 +259,27 @@
     if (g.drops.length > MAX_DROPS) g.drops.splice(0, g.drops.length - MAX_DROPS);
   }
 
-  function stain(S, x, y, size, plat) {
+  function stain(S, x, y, size, plat, vertical) {
     const g = S.gore;
     const blobs = [];
     const n = 2 + ((Math.random() * 4) | 0);
     for (let i = 0; i < n; i++) {
-      blobs.push({ dx: rnd(-size, size), dy: rnd(-1.5, 1.5), r: rnd(size * 0.35, size * 0.95) });
+      blobs.push(vertical
+        ? { dx: rnd(-1.5, 1.5), dy: rnd(-size, size), r: rnd(size * 0.35, size * 0.95) }
+        : { dx: rnd(-size, size), dy: rnd(-1.5, 1.5), r: rnd(size * 0.35, size * 0.95) });
     }
     g.decals.push({
       x, y, plat: plat ? plat.id : -1,
       ox: plat ? x - LV.platX(plat, S.time) : 0,
-      blobs, c: pick(BLOOD), a: rnd(0.55, 0.9)
+      blobs, c: pick(BLOOD), a: rnd(0.55, 0.9), vert: !!vertical
     });
     if (g.decals.length > MAX_DECALS) g.decals.splice(0, g.decals.length - MAX_DECALS);
   }
 
   /* ---------------- ragdoll integration ---------------- */
-  function stepRagdoll(S, dt) {
-    const rd = S.gore.rd;
+  function stepRagdoll(S, dt) { stepBody(S, S.gore.rd, dt); }
+
+  function stepBody(S, rd, dt) {
     if (!rd || rd.asleep) return;
     const pts = rd.pts;
     const grav = G * dt * dt;
@@ -293,7 +303,7 @@
         a.x += dx * f; a.y += dy * f;
         q.x -= dx * f; q.y -= dy * f;
       }
-      for (const p of pts) collide(S, p, dt);
+      for (const p of pts) collide(S, p, dt, rd);
     }
 
     /* a detached head keeps rolling */
@@ -313,17 +323,32 @@
     if (!moving) rd.asleep = true;
   }
 
-  function collide(S, p, dt) {
+  function collide(S, p, dt, rd) {
     const plats = S.level.plats;
     /* A corpse is meant to end up at the bottom, so it slides off ledges and
        eventually slips through them. A body you put down on purpose is not —
        it settles on whatever block it lands on and stays there. */
-    const alive = !!(S.gore.rd && S.gore.rd.alive);
+    const alive = !!(rd ? rd.alive : (S.gore.rd && S.gore.rd.alive));
     let vx = p.x - p.px, vy = p.y - p.py;
     p.contact = false;
 
-    if (p.x < p.r) { p.x = p.r; p.px = p.x + vx * WALL_BOUNCE; }
-    else if (p.x > W - p.r) { p.x = W - p.r; p.px = p.x + vx * WALL_BOUNCE; }
+    if (p.x < p.r) {
+      const imp = Math.abs(vx) / dt;
+      p.x = p.r; p.px = p.x + vx * WALL_BOUNCE;
+      if (imp > IMPACT_MIN) onImpact(S, p, imp, 'wall', rd, -1);
+    } else if (p.x > W - p.r) {
+      const imp = Math.abs(vx) / dt;
+      p.x = W - p.r; p.px = p.x + vx * WALL_BOUNCE;
+      if (imp > IMPACT_MIN) onImpact(S, p, imp, 'wall', rd, 1);
+    }
+    const ceil = S.level.ceiling;
+    if (ceil && vy > 0 && p.y + p.r >= ceil) {
+      const imp = vy / dt;
+      p.y = ceil - p.r;
+      p.py = p.y + vy * BOUNCE;
+      p.px = p.x - vx * 0.8;
+      if (imp > IMPACT_MIN) onImpact(S, p, imp, 'ceiling', rd, 0);
+    }
 
     let hit = null;
     if (vy < 0 && p.noClip <= 0) {
@@ -343,7 +368,7 @@
       if (impact > IMPACT_MIN) {
         p.py = p.y + vy * BOUNCE;
         p.px = p.x - vx * 0.7;
-        onImpact(S, p, impact, hit);
+        onImpact(S, p, impact, hit, rd);
       } else {
         p.py = p.y;
         p.px = p.x - vx * (alive ? LIVE_SLIDE_KEEP : SLIDE_KEEP);
@@ -370,7 +395,7 @@
       if (impact > IMPACT_MIN) {
         p.py = p.y + vy * BOUNCE * 0.8;
         p.px = p.x - vx * 0.6;
-        onImpact(S, p, impact, null);
+        onImpact(S, p, impact, null, rd);
       } else {
         p.py = p.y;
         p.px = p.x - vx * GROUND_KEEP;
@@ -380,9 +405,20 @@
     }
   }
 
-  function onImpact(S, p, impact, plat) {
-    const rd = S.gore.rd;
+  function onImpact(S, p, impact, plat, body, side) {
+    const rd = body || S.gore.rd;
+    if (rd && rd.onSmash) rd.onSmash(impact, p, plat);
     if (!rd || rd.alive) return;                   // a live ragdoll just thumps
+    const onWall = plat === 'wall', onCeiling = plat === 'ceiling';
+    if (onWall || onCeiling) {
+      if (!bloodOn()) return;
+      const amt = clamp(impact / 700, 0.25, 1.4);
+      splash(S, p.x, p.y, scale(Math.round(3 + amt * 11)), 130 * amt, 0);
+      stain(S, onWall ? (side < 0 ? 1.5 : W - 1.5) : p.x,
+            onCeiling ? S.level.ceiling - 1.5 : p.y,
+            p.r * (0.8 + amt * 0.8), null, onWall);
+      return;
+    }
     /* a hard enough landing bursts an intact body open */
     if (cutsOn() && !rd.burst && impact > SPLAT_IMPACT) {
       const intact = rd.bones.some(b => b.stiff === 1 && !b.dead);
@@ -449,7 +485,7 @@
           a.x += dx * f; a.y += dy * f;
           b.x -= dx * f; b.y -= dy * f;
         }
-        for (const p of rope.pts) collide(S, p, dt);
+        for (const p of rope.pts) collide(S, p, dt, null);
       }
     }
   }
@@ -475,6 +511,8 @@
 
       if (p.x < p.r) { squish(p, Math.abs(p.vx), Math.PI / 2); p.x = p.r; p.vx = Math.abs(p.vx) * 0.45; }
       else if (p.x > W - p.r) { squish(p, Math.abs(p.vx), Math.PI / 2); p.x = W - p.r; p.vx = -Math.abs(p.vx) * 0.45; }
+      const ceilY = S.level.ceiling;
+      if (ceilY && p.vy > 0 && p.y + p.r >= ceilY) { squish(p, p.vy, 0); p.y = ceilY - p.r; p.vy = -p.vy * 0.4; }
 
       let landed = null;
       if (p.vy <= 0 && p.noClip <= 0) {
@@ -594,7 +632,8 @@
       ctx.fillStyle = d.c;
       for (const b of d.blobs) {
         ctx.beginPath();
-        ctx.ellipse(x + b.dx, sy + b.dy - 1, b.r, b.r * 0.55, 0, 0, 6.284);
+        if (d.vert) ctx.ellipse(x + b.dx, sy + b.dy, b.r * 0.55, b.r, 0, 0, 6.284);
+        else ctx.ellipse(x + b.dx, sy + b.dy - 1, b.r, b.r * 0.55, 0, 0, 6.284);
         ctx.fill();
       }
     }
@@ -766,5 +805,7 @@
     ctx.restore();
   }
 
-  SL.gore = { reset, softReset, spawn, spawnLimp, kill, step, focus, drawDecals, drawParts, splash };
+  SL.gore = { reset, softReset, spawn, spawnLimp, kill, step, focus, drawDecals, drawParts, splash,
+    /* reusable pieces, for the smash lab */
+    makeRagdoll, stepBody, drawRagdoll, cut, stain, splashAt: splash, HEAD, CHEST, HIP };
 })(window.SL);

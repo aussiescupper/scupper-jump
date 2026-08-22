@@ -298,6 +298,11 @@ kbd{background:rgba(255,255,255,.10);border:1px solid var(--line2);border-bottom
 .sw.bouncy{background:#3ddc97}
 .sw.spike{background:#ff5d6c}
 
+.btn-lab{background:linear-gradient(180deg,rgba(255,93,108,.18),rgba(255,93,108,.10));
+  border-color:rgba(255,93,108,.45);color:#ff9aa3}
+.btn-lab:hover{background:rgba(255,93,108,.24)}
+#hud-lab{color:var(--gold)}
+
 /* ============ endless ============ */
 .btn-endless{background:linear-gradient(180deg,rgba(201,164,255,.18),rgba(201,164,255,.10));
   border-color:rgba(201,164,255,.45);color:#dcc6ff}

@@ -28,6 +28,7 @@
       <div class="hud-chip" id="hud-coins"><span class="coin-dot"></span><span id="hud-coin-n">0</span><span id="hud-coin-sep">/</span><span id="hud-coin-t">0</span></div>
       <div class="hud-chip" id="hud-deaths">☠ <span id="hud-death-n">0</span></div>
       <div class="hud-chip" id="hud-height" hidden><span id="hud-height-n">0</span> m</div>
+      <div class="hud-chip" id="hud-lab" hidden><span class="coin-dot"></span>+<span id="hud-lab-n">0</span></div>
     </div>
     <div class="climb-rail" aria-hidden="true">
       <div class="climb-fill" id="climb-fill"></div>
@@ -72,6 +73,7 @@
         <div class="menu">
           <button class="btn btn-primary" id="btn-play">▶ <span id="btn-play-label">Play</span></button>
           <button class="btn btn-endless" id="btn-endless">♾ Endless <span id="btn-endless-best"></span></button>
+          <button class="btn btn-lab" id="btn-lab">🔨 Smash Lab</button>
           <div class="menu-row">
             <button class="btn" id="btn-levels">🗺 Levels</button>
             <button class="btn" id="btn-shop">🛒 Shop</button>
@@ -168,6 +170,7 @@
             <li><i class="sw bouncy"></i>Bouncer — flings you way up.</li>
             <li><i class="sw spike"></i>Spikes &amp; sawblades — they cut through whatever they touch.</li>
           </ul>
+          <p><b>Smash Lab.</b> A room full of stick figures and no climbing. Drag one about with a finger or the mouse, fling it at the blocks, the spikes or the sawblades, and you get paid for the damage. Bodies restock themselves. Everything you earn goes straight into your Stick Credits.</p>
           <p><b>Endless.</b> One tower, no top, and a red floor that keeps rising. It gets harder the higher you go and stops getting harder at 520m. One life per run — your best climb is kept, and every metre pays Stick Credits.</p>
           <p><b>Go limp.</b> Press <kbd>R</kbd> or tap the stickman button at the bottom of the screen and he drops into a ragdoll wherever he is. Press it again to get back up. Flop into the red floor while limp and it counts as a death.</p>
           <p><b>Mind the drop.</b> Land from too great a height and he trips over — no control for a moment while he picks himself up, which is plenty of time to slide off a ledge. Grip Gloves let you take a harder landing before it happens.</p>
@@ -234,6 +237,7 @@
 <script src="js/items.js"></script>
 <script src="js/stick.js"></script>
 <script src="js/level.js"></script>
+<script src="js/lab.js"></script>
 <script src="js/gore.js"></script>
 <script src="js/render.js"></script>
 <script src="js/game.js"></script>

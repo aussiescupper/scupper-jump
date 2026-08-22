@@ -120,16 +120,33 @@
         sp: rng.range(12, 46), ph: rng.range(0, 6.28), sw: rng.range(6, 26)
       });
     }
-    /* ground horizon silhouette */
+    /* ground horizon silhouette — an indoor room has none */
     const horizon = [];
-    for (let i = 0; i < 22; i++) {
-      horizon.push({ x: rng.range(-30, VW + 30), w: rng.range(30, 95), h: rng.range(26, 110), r: rng.range(0, 1) });
+    if (!level.lab) {
+      for (let i = 0; i < 22; i++) {
+        horizon.push({ x: rng.range(-30, VW + 30), w: rng.range(30, 95), h: rng.range(26, 110), r: rng.range(0, 1) });
+      }
     }
-    return { decor, motes, horizon, kind, th, wrap: !!level.endless };
+    return { decor, motes, horizon, kind, th, wrap: !!level.endless, lab: !!level.lab };
   }
 
   function drawBackdrop(bd, camY, t, progress) {
     const th = bd.th;
+    if (bd.lab) {                       // flat interior, no sky and no skyline
+      const g = ctx.createLinearGradient(0, 0, 0, view.h);
+      g.addColorStop(0, '#121829');
+      g.addColorStop(1, '#0a0e19');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, view.w, view.h);
+      ctx.fillStyle = 'rgba(255,255,255,.05)';
+      for (const m of bd.motes) {
+        const y = ((m.y + t * m.sp * 0.25) % (view.h + 40)) - 20;
+        ctx.beginPath();
+        ctx.arc(m.x + Math.sin(t * 0.6 + m.ph) * m.sw, y, m.r * 0.8, 0, 6.284);
+        ctx.fill();
+      }
+      return;
+    }
     /* sky: blend the three stops as you climb */
     const g = ctx.createLinearGradient(0, 0, 0, view.h);
     const a = th.sky[0], b = th.sky[1], c = th.sky[2];
@@ -361,6 +378,50 @@
     ctx.restore();
   }
 
+  /* ---------- the smash lab room ---------- */
+  function drawRoom(ctx, lv, toY) {
+    const ceilY = toY(lv.ceiling);
+    const floorY = toY(0);
+    const TH = 9;
+    const wallGrad = ctx.createLinearGradient(0, 0, TH, 0);
+    wallGrad.addColorStop(0, '#2b3350');
+    wallGrad.addColorStop(1, '#141a2c');
+
+    ctx.save();
+    /* left and right walls */
+    ctx.fillStyle = wallGrad;
+    ctx.fillRect(0, ceilY, TH, floorY - ceilY);
+    ctx.save();
+    ctx.translate(view.w, 0); ctx.scale(-1, 1);
+    ctx.fillStyle = wallGrad;
+    ctx.fillRect(0, ceilY, TH, floorY - ceilY);
+    ctx.restore();
+    /* ceiling */
+    const cg = ctx.createLinearGradient(0, ceilY, 0, ceilY + TH);
+    cg.addColorStop(0, '#141a2c'); cg.addColorStop(1, '#2b3350');
+    ctx.fillStyle = cg;
+    ctx.fillRect(0, ceilY, view.w, TH);
+    /* padded panel seams so the surfaces read */
+    ctx.strokeStyle = 'rgba(255,255,255,.07)';
+    ctx.lineWidth = 1;
+    for (let y = ceilY + 34; y < floorY; y += 34) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(TH, y);
+      ctx.moveTo(view.w - TH, y); ctx.lineTo(view.w, y); ctx.stroke();
+    }
+    for (let x = 34; x < view.w; x += 34) {
+      ctx.beginPath(); ctx.moveTo(x, ceilY); ctx.lineTo(x, ceilY + TH); ctx.stroke();
+    }
+    /* inner highlight edges */
+    ctx.strokeStyle = 'rgba(255,255,255,.16)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(TH, ceilY + TH); ctx.lineTo(TH, floorY);
+    ctx.moveTo(view.w - TH, ceilY + TH); ctx.lineTo(view.w - TH, floorY);
+    ctx.moveTo(0, ceilY + TH); ctx.lineTo(view.w, ceilY + TH);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   /* ---------- the whole frame ---------- */
   function frame(S) {
     const lv = S.level, th = lv.theme, t = S.time, camY = S.camY;
@@ -381,6 +442,9 @@
       ? ((S.player.y % 3000) + 3000) % 3000 / 3000
       : clamp(S.player.y / Math.max(1, lv.goalY), 0, 1);
     drawBackdrop(S.backdrop, camY, t, progress);
+
+    /* the smash room: walls and ceiling, drawn before the blood so it lands on them */
+    if (lv.lab) drawRoom(ctx, lv, toY);
 
     /* platforms */
     for (const p of lv.plats) {
@@ -434,12 +498,16 @@
 
     /* the remains — or a body that has gone limp on purpose */
     if (S.player.dead || S.limp) SL.gore.drawParts(S, ctx, toY, t);
+    if (S.mode === 'lab' && S.lab) {
+      SL.gore.drawParts(S, ctx, toY, t);      // blood and giblets from the smashing
+      SL.lab.draw(ctx, S, toY, t);
+    }
 
     /* player (with trail for the fancier skins) */
     const pl = S.player;
     const skin = SL.items.byId[SL.save.equipped('skin')];
     const fx = skin ? skin.fx : null;
-    if (!pl.dead && !S.limp && (fx === 'ghost' || fx === 'glow' || fx === 'rainbow') && !SL.save.data.settings.lowfx) {
+    if (!pl.dead && !S.limp && S.mode !== 'lab' && (fx === 'ghost' || fx === 'glow' || fx === 'rainbow') && !SL.save.data.settings.lowfx) {
       for (let i = 0; i < pl.trail.length; i++) {
         const tr = pl.trail[i];
         const a = (i / pl.trail.length) * 0.34;
@@ -449,7 +517,7 @@
         ctx.restore();
       }
     }
-    if (!pl.dead && !S.limp) {
+    if (!pl.dead && !S.limp && S.mode !== 'lab') {
       ctx.save();
       ctx.translate(pl.x + pl.w / 2, toY(pl.y));
       SL.stick.draw(ctx, {
@@ -469,7 +537,7 @@
     }
 
     /* the lethal floor, drawn where it actually is */
-    if (S.baseCam > 4) {
+    if (S.baseCam > 4 && S.mode !== 'lab') {
       const fy = toY(S.baseCam);
       if (fy > -20 && fy < view.h + 60) {
         const g = ctx.createLinearGradient(0, fy - 40, 0, fy);
@@ -509,5 +577,13 @@
     }
   }
 
-  SL.render = { setup, resize, frame, view, burst, stepParts, clearParts, makeBackdrop, parts };
+  /** client pixel -> world coordinate, for grabbing things with a finger */
+  function toWorld(clientX, clientY, camY) {
+    const rect = canvas.getBoundingClientRect();
+    const sx = (clientX - rect.left - view.ox) / view.scale;
+    const sy = (clientY - rect.top - view.oy) / view.scale;
+    return { x: sx, y: camY + (view.h - sy) };
+  }
+
+  SL.render = { setup, resize, frame, view, burst, stepParts, clearParts, makeBackdrop, parts, toWorld };
 })(window.SL);

@@ -27,6 +27,7 @@
   function hideScreens(showHud) {
     $$('.screen').forEach(s => s.classList.remove('active'));
     current = null;
+    document.getElementById('btn-ragdoll').hidden = false;
     if (!showHud) document.getElementById('retry').hidden = true;
     document.getElementById('hud').hidden = !showHud;
     document.getElementById('touch').hidden = !(showHud && touchWanted());
@@ -257,14 +258,21 @@
   function bindHud() {
     SL.game.on('hud', (h) => {
       const lvl = $('#hud-level');
-      const txt = h.endless ? 'Endless · ' + h.themeName : 'Lvl ' + h.n + ' · ' + h.themeName;
+      const txt = h.lab ? 'Smash Lab' : (h.endless ? 'Endless · ' + h.themeName : 'Lvl ' + h.n + ' · ' + h.themeName);
       if (lvl.textContent !== txt) lvl.textContent = txt;
       $('#hud-coin-n').textContent = h.coins;
       $('#hud-coin-t').textContent = h.coinTotal;
       $('#hud-death-n').textContent = h.deaths;
       $('#hud-height-n').textContent = fmtNum(h.height);
       $('#hud-height').hidden = !h.endless;
-      $('#hud-deaths').hidden = !!h.endless;
+      $('#hud-lab-n').textContent = fmtNum(h.labEarned);
+      $('#hud-lab').hidden = !h.lab;
+      $('#hud-deaths').hidden = !!h.endless || !!h.lab;
+      $('#hud-coins').hidden = !!h.lab;
+      /* nothing to drive in the lab — get the controls out of the way */
+      $('#btn-ragdoll').hidden = !!h.lab;
+      $('.climb-rail').hidden = !!h.lab;
+      if (h.lab) document.getElementById('touch').hidden = true;
       $('#hud-coin-sep').hidden = !!h.endless;
       $('#hud-coin-t').hidden = !!h.endless;
       $('#climb-fill').style.height = (h.progress * 100).toFixed(1) + '%';
@@ -380,9 +388,15 @@
     SL.game.startEndless();
   }
 
+  function playLab() {
+    hideScreens(true);
+    SL.game.startLab();
+  }
+
   function bind() {
     $('#btn-play').addEventListener('click', () => { SL.audio.play('ui'); playLevel(SL.save.data.unlocked); });
     $('#btn-endless').addEventListener('click', () => { SL.audio.play('ui'); playEndless(); });
+    $('#btn-lab').addEventListener('click', () => { SL.audio.play('ui'); playLab(); });
     $('#btn-levels').addEventListener('click', () => { SL.audio.play('ui'); show('levels', true); });
     $('#btn-shop').addEventListener('click', () => { SL.audio.play('ui'); show('shop', true); });
     $('#btn-settings').addEventListener('click', () => { SL.audio.play('ui'); show('settings', true); });

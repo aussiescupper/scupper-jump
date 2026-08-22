@@ -1,7 +1,7 @@
 /* Scupper Jump — wiring: canvas, input, PWA install, service worker */
 (function (SL) {
   'use strict';
-  SL.VERSION = '1.4.0';
+  SL.VERSION = '1.5.0';
 
   const canvas = document.getElementById('game');
 
@@ -19,6 +19,7 @@
 
     bindKeys();
     bindTouch();
+    bindGrab();
     bindWindow();
 
     SL.game.showcase(SL.save.data.unlocked || 1);
@@ -110,12 +111,37 @@
     }, { passive: true, once: true });
   }
 
+  /* ---------------- grabbing bodies in the smash lab ---------------- */
+  function bindGrab() {
+    const S = SL.game.S;
+    const world = (e) => SL.render.toWorld(e.clientX, e.clientY, S.camY);
+    canvas.addEventListener('pointerdown', (e) => {
+      if (SL.game.mode !== 'lab') return;
+      const w = world(e);
+      if (SL.lab.grabAt(S, w.x, w.y)) {
+        e.preventDefault();
+        try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+      }
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      if (SL.game.mode !== 'lab' || !SL.lab.isGrabbing(S)) return;
+      e.preventDefault();
+      const w = world(e);
+      SL.lab.moveGrab(S, w.x, w.y);
+    });
+    const drop = () => { if (SL.game.mode === 'lab') SL.lab.release(S); };
+    canvas.addEventListener('pointerup', drop);
+    canvas.addEventListener('pointercancel', drop);
+    canvas.addEventListener('pointerleave', drop);
+  }
+
   /* ---------------- window / lifecycle ---------------- */
   function bindWindow() {
     /* Nothing clears the body on its own. Any tap or click does — except the
        pause button and anything on an open menu. Capture phase, so the touch
        pad does not swallow it. */
     document.addEventListener('pointerdown', (e) => {
+      if (SL.game.mode === 'lab') return;
       if (!SL.game.awaitingRetry) return;
       const t = e.target;
       if (t && t.closest && t.closest('#screens, #btn-pause')) return;

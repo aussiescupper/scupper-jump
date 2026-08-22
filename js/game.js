@@ -31,7 +31,7 @@
     time: 0, camY: MIN_CAM, baseCam: MIN_CAM, anchor: 0, followGap: 260,
     player: null, mods: null,
     run: null,               // per-attempt bookkeeping
-    shield: false, checkpoint: null, limp: false,
+    shield: false, checkpoint: null, limp: false, lab: null,
     awaitRetry: false, deathCause: null,
     hudDirty: true
   };
@@ -62,6 +62,7 @@
       endless: !!endless, height: 0
     };
     S.checkpoint = null;
+    S.lab = null;
     SL.gore.reset(S);
     resetAttempt(true);
     S.mode = mode || 'play';
@@ -575,9 +576,13 @@
   function pushHud() {
     if (!S.level) return;
     const endless = !!(S.run && S.run.endless);
+    const lab = !!(S.run && S.run.lab);
     fire('hud', {
       n: S.level.n,
-      endless,
+      endless, lab,
+      labEarned: lab && S.lab ? S.lab.earned : 0,
+      labCombo: lab && S.lab ? S.lab.combo : 0,
+      labBodies: lab && S.lab ? S.lab.bodies.length : 0,
       themeName: S.level.theme.name,
       coins: S.run ? S.run.collected : 0,
       coinTotal: endless ? 0 : S.level.coins.length,
@@ -600,7 +605,7 @@
     if (dt > 0.25) dt = 0.25;
 
     if (S.mode === 'play') pollGamepad();
-    const running = S.mode === 'play' || S.mode === 'menu' || S.mode === 'complete';
+    const running = S.mode === 'play' || S.mode === 'menu' || S.mode === 'complete' || S.mode === 'lab';
     if (running) {
       acc += dt;
       let guard = 0;
@@ -608,6 +613,7 @@
         acc -= STEP;
         if (S.mode === 'menu') { S.time += STEP; idleStep(STEP); }
         else if (S.mode === 'complete') { S.time += STEP; R.stepParts(STEP); }
+        else if (S.mode === 'lab') { S.time += STEP; SL.lab.step(S, STEP); }
         else step(STEP);
       }
       if (S.mode !== 'menu') R.stepParts(dt);
@@ -616,7 +622,7 @@
 
     if (S.level) R.frame(S);
     hudClock += dt;
-    if (S.hudDirty || (S.mode === 'play' && hudClock > 0.08)) { pushHud(); hudClock = 0; S.hudDirty = false; }
+    if (S.hudDirty || ((S.mode === 'play' || S.mode === 'lab') && hudClock > 0.08)) { pushHud(); hudClock = 0; S.hudDirty = false; }
   }
 
   /* menu: the stickman idles on the ground behind the panels — just enough
@@ -656,6 +662,21 @@
       return true;
     },
     startEndless() { loadLevel(0, 'play', true); input.jumpEdge = false; },
+
+    /* The smash lab: no climbing, no goal, just a room and a wallet. */
+    startLab() {
+      S.mods = SL.items.modifiers();
+      SL.lab.start(S);
+      S.backdrop = R.makeBackdrop(S.level);
+      S.player = newPlayer(-500, -500);
+      S.run = { n: 0, coins: 0, gems: 0, value: 0, deaths: 0, elapsed: 0, collected: 0,
+                replay: false, started: true, halfway: false, endless: false, height: 0, lab: true };
+      S.camY = MIN_CAM; S.baseCam = MIN_CAM; S.anchor = 0; S.rising = MIN_CAM - 999;
+      S.limp = false; S.awaitRetry = false;
+      S.mode = 'lab';
+      S.hudDirty = true;
+      pushHud();
+    },
     get awaitingRetry() { return !!S.awaitRetry && !!S.player && S.player.dead; },
     restart() {
       const n = S.level ? S.level.n : 1;

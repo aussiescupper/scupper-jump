@@ -80,6 +80,18 @@ Settings has a **Gore** tab with two independent switches:
 | on | off | stays whole, bleeds where he lands |
 | off | off | a clean ragdoll |
 
+### Smash Lab
+
+A plain padded room — floor, two walls, a ceiling, nothing else. Five stick figures stand about on
+the floor. Grab one with a finger or the mouse, fling it at a surface, and you get paid for the
+damage. Bodies restock themselves and the blood stays on the walls. Every control is hidden here;
+there is nothing to drive.
+
+The bodies are the same Verlet ragdoll as everywhere else, so they come apart and bleed on a hard
+enough hit. Payouts are rate-limited to one per body per wallop and capped per body — without that
+a single throw bills for every limb that touches down and pays thousands. An active minute earns
+roughly what a level does; standing still earns nothing.
+
 ### Endless
 
 One tower with no top, a red floor that keeps rising, and one life per run. Difficulty is a
@@ -184,6 +196,7 @@ js/save.js          localStorage-backed progress
 js/audio.js         WebAudio synth — every sound is generated, no audio files
 js/items.js         shop catalogue + the modifiers it feeds to the physics
 js/stick.js         the stickman renderer (game canvas AND shop previews)
+js/lab.js           the smash lab: a room, some bodies, and a wallet
 js/level.js         procedural towers, the endless tower, the reachability proof
 js/gore.js          the Verlet ragdoll, the cut plane, organs, blood, stains
 js/render.js        backdrop, blocks, coins, hazards, particles, camera
