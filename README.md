@@ -1,0 +1,182 @@
+# Scupper Jump
+
+A stick-figure tower climber that installs like a real app. Built for
+[**ScupperLab**](https://github.com/aussiescupper) — no build step, no dependencies, no network
+required after the first load.
+
+> Climb the blocks. Reach the flag. Spend your Stick Credits.
+
+## The game
+
+You are a stickman at the bottom of a tower of blocks. Jump your way up and land on the golden
+**goal block** at the top to clear the level. Level 1 is a gentle ladder of wide, solid blocks.
+By level 25 you are threading crumbling ledges, sliding platforms, ice and sawblades with a
+lethal floor climbing up behind you.
+
+* **Levels are endless and deterministic.** Every tower is generated from its own level number, so
+  level 7 is the same tower for everybody — and the generator *proves* each jump is possible using
+  base physics before it places a block. No shop gear is ever required to finish a level.
+* **Difficulty ramps to level 25**, then holds: blocks get narrower and further apart, and hazards
+  are introduced one at a time so each one gets a level or two to itself.
+* **Stick Credits** come from coins, gems, clear bonuses, beating par time and finishing without
+  dying. Replaying a cleared level pays 30%.
+* **Stars** — ★ clear it · ★★ clear it without dying · ★★★ and collect every coin.
+
+### Dying
+
+The stickman is a **Verlet ragdoll** — eleven points (head, chest, hip, elbows, hands, knees,
+feet) held together by bones. When he dies he stops being driven and just flops: limbs trail,
+the body folds over ledges, the head lolls on its neck.
+
+He comes apart **wherever the blade went through**. Every bone crossing the cut plane is severed
+and simply stops holding, so the pieces separate on their own:
+
+| Cut at | Result |
+|---|---|
+| neck | decapitated — the head bounces off on its own, rolling as it goes |
+| chest | head-and-shoulders one way, hips-and-legs the other, both arms off |
+| waist | cut clean in half |
+| thigh | legs off at the hip |
+| shin | takes his feet off |
+
+Spikes cut at the tip height, so landing on them feet-first takes your legs — but jump up
+*into* them and you lose your head. Sawblades cut through their own centre line, so where you
+meet one decides what you lose. Falling into the floor severs nothing: he ragdolls down intact,
+and bursts open if he lands hard enough.
+
+A heart, two lungs, a liver, two lengths of intestine and four gibs spill from the cut. Everything
+tumbles the whole way down the tower, spraying blood and leaving **permanent stains** on every
+surface it touches. The mess stays for the rest of your attempt; it is only cleared when you leave
+the level.
+
+**Nothing stops it on its own.** The ragdoll runs until you tap, click or press a key. Anyone who
+would rather not watch can turn **Blood & guts** off in Settings — he still ragdolls, but stays in
+one piece with no blood, and the click-to-continue behaviour is unchanged.
+
+### Blocks and hazards
+
+| | | from level |
+|---|---|---|
+| Solid | dependable footing | 1 |
+| Sliding | shifts side to side | 4 |
+| Bouncer | flings you far above a normal jump | 5 |
+| Crumbling | collapses ~0.4 s after you land, rebuilds after 3 s | 6 |
+| Spikes | one third of a block's surface, instant restart | 8 |
+| Ice | very low friction | 10 |
+| Sawblade | patrols the gaps between blocks | 12 |
+
+Eight themes rotate every four levels — The Back Fence, Outback Run, Bondi Rise, Reef Ascent,
+Harbour Lights, Uluru at Dusk, Snowy Peaks, Southern Cross.
+
+## The shop
+
+| Gear | What it does |
+|---|---|
+| Spring Boots ×3 | +6% jump height per tier |
+| Air Dash ×2 | double jump, then triple jump |
+| Feather Fall ×2 | slower fall, softer terminal speed |
+| Grip Gloves ×2 | sharper air steering, then a wall slide |
+| Coin Magnet ×2 | pulls coins from 70px, then 140px |
+| Lucky Charm ×2 | +15% then +35% credits earned |
+| Guardian | start each attempt with a shield that soaks one hazard |
+| Checkpoint Beacon | respawn at the halfway mark instead of the bottom |
+
+Plus ten skins (some with glow, ghosting, sparkle, ember and hue-cycling effects) and eight hats,
+including a cork hat and an Akubra. Everything is drawn live — the shop previews are the same
+renderer that draws the stickman in game.
+
+## Controls
+
+| | |
+|---|---|
+| Move | <kbd>A</kbd>/<kbd>D</kbd> or <kbd>←</kbd>/<kbd>→</kbd> |
+| Jump | <kbd>Space</kbd>, <kbd>W</kbd> or <kbd>↑</kbd> — **hold for a higher jump** |
+| Pause | <kbd>Esc</kbd> or <kbd>P</kbd> |
+| Restart level | <kbd>R</kbd> |
+| Mute | <kbd>M</kbd> |
+
+On a touch device an on-screen pad appears automatically. Gamepads work too (left stick / d-pad
+and the bottom face button).
+
+## Running it
+
+Any static server will do — a service worker is required for install and offline, so `file://`
+will not cut it.
+
+```bash
+python3 -m http.server 8000
+```
+
+Then open <http://localhost:8000>. Add `?dev=1` to the URL to skip service-worker registration
+while you are editing.
+
+## Deploying to GitHub Pages
+
+Push to `main` and the included workflow publishes the repository root:
+
+```bash
+git init && git add -A && git commit -m "Scupper Jump"
+git branch -M main
+git remote add origin git@github.com:aussiescupper/scupper-jump.git
+git push -u origin main
+```
+
+Then in **Settings → Pages**, set *Source* to **GitHub Actions**. The game lands at
+`https://aussiescupper.github.io/scupper-jump/`. Relative paths are used throughout, so it works
+from any sub-path.
+
+## PWA notes
+
+* `manifest.webmanifest` — standalone display, portrait, maskable icons, shortcuts to Shop and Levels.
+* `sw.js` — precaches every asset on install, cache-first for assets, network-first for navigation
+  so updates land. **Bump `VERSION` in `sw.js` whenever you ship**, or returning players keep the
+  old cache.
+* Icons are generated PNGs (192/512 plus maskable variants and an Apple touch icon).
+* Progress lives in `localStorage` under `scupperlab.jump.v1`.
+
+## Layout
+
+```
+index.html          screens, HUD, touch pad
+styles.css          all styling
+manifest.webmanifest
+sw.js               offline cache
+js/util.js          maths, seeded RNG, formatting
+js/save.js          localStorage-backed progress
+js/audio.js         WebAudio synth — every sound is generated, no audio files
+js/items.js         shop catalogue + the modifiers it feeds to the physics
+js/stick.js         the stickman renderer (game canvas AND shop previews)
+js/level.js         procedural towers + the reachability proof
+js/gore.js          the Verlet ragdoll, the cut plane, organs, blood, stains
+js/render.js        backdrop, blocks, coins, hazards, particles, camera
+js/game.js          simulation, input, camera, scoring, main loop
+js/ui.js            DOM screens, shop, level select
+js/boot.js          wiring, PWA install, service worker
+icons/              generated PNG icon set
+```
+
+### A note on the ragdoll
+
+Points integrate in Verlet, then six relaxation passes pull the bones back to length with
+collision resolved inside the loop — that is what keeps limbs from stretching under a hard impact
+(measured bone stretch after a 1400px fall: 1.00–1.01× rest length).
+
+Getting the body to the *bottom* rather than parking on a ledge takes three rules. Contacts under
+55 px/s count as resting, not impacts, so a settled piece does not have its speed scrubbed every
+frame. A stalled point is walked toward the nearer block edge — the far one if the near one is
+jammed against a wall. And anything still stuck after 1.3 s slips straight through. Verified from
+1400px up: every point ends flat on the floor, whatever the cut.
+
+The camera tracks the centroid of the whole ragdoll rather than its lowest point, or it would
+abandon the body to chase the first giblet that hit the floor.
+
+### A note on the camera
+
+The lethal floor climbs with the highest block you have actually **landed on**, not with your
+airborne peak. Without that, a bouncer would fling you upward, drag the floor along with you, and
+kill you on the way back down through your own launch pad. The view is allowed to rise above the
+floor to keep you in shot and slides back down as you fall.
+
+---
+
+Made by [@aussiescupper](https://github.com/aussiescupper) · ScupperLab
