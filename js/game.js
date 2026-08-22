@@ -136,6 +136,10 @@
     S.time += dt;
     S.followGap = followGapFor(lv.n);
 
+    /* previous corpses keep settling while you climb, so one retired mid-fall
+       finishes its tumble instead of hanging in the air */
+    SL.gore.stepOld(S, dt);
+
     /* animate platform states regardless of player */
     for (const p of lv.plats) {
       if (p.compress) p.compress = Math.max(0, p.compress - dt * 4);

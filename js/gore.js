@@ -466,10 +466,10 @@
   }
 
   /* the guts: Verlet rope, same integrator and collisions as the ragdoll */
-  function stepRopes(S, dt) {
-    const g = S.gore;
+  function stepRopes(S, dt, list) {
+    const ropes = list || S.gore.ropes;
     const grav = G * gmul(S) * dt * dt;
-    for (const rope of g.ropes) {
+    for (const rope of ropes) {
       rope.wob += dt * 1.4;
       for (const p of rope.pts) {
         if (p.noClip > 0) p.noClip -= dt;
@@ -493,11 +493,13 @@
     }
   }
 
-  function stepLoose(S, dt) {
+  function stepLoose(S, dt, partList, dropList) {
     const g = S.gore;
+    const parts = partList || g.parts;
+    const drops = dropList || g.drops;
     const plats = S.level.plats;
 
-    for (const p of g.parts) {
+    for (const p of parts) {
       /* soft bodies: the squash from the last knock springs back and overshoots,
          and they never sit perfectly still */
       p.squashV += (-p.squash * 900 - p.squashV * 16) * dt;
@@ -575,15 +577,15 @@
       } else if (p.onPlat && p.vy !== 0) { p.onPlat = null; p.stuckT = 0; }
     }
 
-    for (let i = g.drops.length - 1; i >= 0; i--) {
-      const d = g.drops[i];
+    for (let i = drops.length - 1; i >= 0; i--) {
+      const d = drops[i];
       d.life -= dt;
-      if (d.life <= 0) { g.drops.splice(i, 1); continue; }
+      if (d.life <= 0) { drops.splice(i, 1); continue; }
       const dy = d.y;
       d.vy -= 1500 * gmul(S) * dt;
       d.x += d.vx * dt;
       d.y += d.vy * dt;
-      if (d.x < 1 || d.x > W - 1) { stain(S, clamp(d.x, 2, W - 2), d.y, d.r * 1.6, null); g.drops.splice(i, 1); continue; }
+      if (d.x < 1 || d.x > W - 1) { stain(S, clamp(d.x, 2, W - 2), d.y, d.r * 1.6, null); drops.splice(i, 1); continue; }
       if (d.vy > 0) continue;
       let hit = null;
       for (const pl of plats) {
@@ -592,10 +594,10 @@
         if (d.x < px || d.x > px + pl.w) continue;
         if (dy >= pl.y - 0.5 && d.y <= pl.y) { hit = pl; break; }
       }
-      if (hit) { stain(S, d.x, hit.y, d.r * 1.8, hit); g.drops.splice(i, 1); continue; }
-      if (d.y <= 0) { stain(S, d.x, 0.5, d.r * 1.9, null); g.drops.splice(i, 1); }
+      if (hit) { stain(S, d.x, hit.y, d.r * 1.8, hit); drops.splice(i, 1); continue; }
+      if (d.y <= 0) { stain(S, d.x, 0.5, d.r * 1.9, null); drops.splice(i, 1); }
     }
-    if (g.drops.length > MAX_DROPS) g.drops.splice(0, g.drops.length - MAX_DROPS);
+    if (drops.length > MAX_DROPS) drops.splice(0, drops.length - MAX_DROPS);
   }
 
   function step(S, dt) {
@@ -604,6 +606,24 @@
     stepRagdoll(S, dt);
     stepRopes(S, dt);
     stepLoose(S, dt);
+    stepOld(S, dt);
+  }
+
+  /* A body retired while it was still tumbling keeps falling until it settles —
+     otherwise clicking retry quickly freezes it in mid-air. */
+  function stepOld(S, dt) {
+    const g = S.gore;
+    if (!g.old) return;
+    for (const o of g.old) {
+      if (o.settled) continue;
+      stepBody(S, o.rd, dt);
+      stepRopes(S, dt, o.ropes);
+      stepLoose(S, dt, o.parts, o.drops);
+      /* latch when it stops, or after long enough that it must have — a body
+         micro-jittering on the floor should not simulate for the whole level */
+      o.age = (o.age || 0) + dt;
+      if (o.rd.asleep || o.age > 20) o.settled = true;
+    }
   }
 
   /** Leave the body where it lies and stop simulating it, so you can climb
@@ -612,7 +632,7 @@
     ensure(S);
     const g = S.gore;
     if (g.rd && g.rd.pts.some((p) => p.y > -40)) {
-      g.old.push({ rd: g.rd, parts: g.parts.slice(), ropes: g.ropes.slice() });
+      g.old.push({ rd: g.rd, parts: g.parts.slice(), ropes: g.ropes.slice(), drops: [], settled: false });
       if (g.old.length > MAX_OLD) g.old.shift();
     }
     g.rd = null;
@@ -689,6 +709,7 @@
       for (const rope of o.ropes) drawGut(ctx, rope, toY);
       for (const p of o.parts) drawOrgan(ctx, p, toY);
       drawRagdoll(ctx, o.rd, toY, time);
+      if (o.drops && o.drops.length) drawDrops(ctx, o.drops, toY);
     }
   }
 
@@ -857,7 +878,7 @@
     ctx.restore();
   }
 
-  SL.gore = { reset, softReset, retire, spawn, spawnLimp, kill, vanish, topOf, step, focus, drawDecals, drawParts, drawOld, splash,
+  SL.gore = { reset, softReset, retire, spawn, spawnLimp, kill, vanish, topOf, step, stepOld, focus, drawDecals, drawParts, drawOld, splash,
     /* reusable pieces, for the smash lab */
     makeRagdoll, stepBody, drawRagdoll, cut, stain, splashAt: splash, HEAD, CHEST, HIP };
 })(window.SL);
