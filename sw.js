@@ -1,5 +1,5 @@
 /* Scupper Jump service worker — offline-first, versioned cache. */
-const VERSION = 'scupper-jump-v1.5.0';
+const VERSION = 'scupper-jump-v1.6.0';
 const ASSETS = [
   './',
   './index.html',

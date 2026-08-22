@@ -107,6 +107,24 @@ body{
 #btn-ragdoll.on{background:rgba(255,176,55,.3);border-color:var(--acc)}
 #hud[hidden] #btn-ragdoll{display:none}
 
+/* ============ smash lab controls ============ */
+#lab-controls{
+  /* top right, clear of the floor where everything actually happens */
+  position:absolute;right:calc(8px + var(--safe-r));top:calc(56px + var(--safe-t));
+  display:flex;gap:8px;pointer-events:none;
+}
+.lab-btn{
+  pointer-events:auto;cursor:pointer;font-family:inherit;font-weight:800;font-size:13px;
+  padding:10px 15px;min-height:42px;border-radius:12px;
+  background:rgba(10,14,25,.62);border:1.5px solid var(--line2);color:var(--txt);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  transition:transform .06s,background .12s,border-color .12s;
+}
+.lab-btn:hover{background:rgba(20,27,45,.8)}
+.lab-btn:active{transform:scale(.95)}
+.lab-btn-clear{color:#ff9aa3;border-color:rgba(255,93,108,.4)}
+.lab-btn-clear:hover{background:rgba(255,93,108,.16)}
+
 /* ============ death prompt ============ */
 #retry{
   position:absolute;left:0;right:0;bottom:calc(112px + var(--safe-b));

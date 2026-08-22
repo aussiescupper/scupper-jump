@@ -272,6 +272,7 @@
       /* nothing to drive in the lab — get the controls out of the way */
       $('#btn-ragdoll').hidden = !!h.lab;
       $('.climb-rail').hidden = !!h.lab;
+      $('#lab-controls').hidden = !h.lab;
       if (h.lab) document.getElementById('touch').hidden = true;
       $('#hud-coin-sep').hidden = !!h.endless;
       $('#hud-coin-t').hidden = !!h.endless;
@@ -397,6 +398,8 @@
     $('#btn-play').addEventListener('click', () => { SL.audio.play('ui'); playLevel(SL.save.data.unlocked); });
     $('#btn-endless').addEventListener('click', () => { SL.audio.play('ui'); playEndless(); });
     $('#btn-lab').addEventListener('click', () => { SL.audio.play('ui'); playLab(); });
+    $('#btn-lab-spawn').addEventListener('click', (e) => { e.stopPropagation(); SL.audio.unlock(); SL.lab.addOne(SL.game.S); });
+    $('#btn-lab-clear').addEventListener('click', (e) => { e.stopPropagation(); SL.audio.unlock(); SL.lab.clearRoom(SL.game.S); });
     $('#btn-levels').addEventListener('click', () => { SL.audio.play('ui'); show('levels', true); });
     $('#btn-shop').addEventListener('click', () => { SL.audio.play('ui'); show('shop', true); });
     $('#btn-settings').addEventListener('click', () => { SL.audio.play('ui'); show('settings', true); });

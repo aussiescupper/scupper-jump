@@ -15,8 +15,9 @@
   const CUT_BONUS = 10;
   const PAY_COOLDOWN = 0.35;        // one payout per body per wallop, not per limb
   const BODY_CAP = 55;              // a single body is worth this much, then it is spent
-  const SPAWN_GRACE = 2.2;          // arriving in the room, and settling, is not a smash
+  const SPAWN_GRACE = 0.3;          // just long enough to swallow the collapse when they go down
   const GRAB_RADIUS = 30;
+  const MAX_BODIES = 14;            // hard ceiling on the spawn button
   const DESPAWN_REST = 6;           // seconds of lying still before a body is cleared away
 
   const rnd = (a, b) => a + Math.random() * (b - a);
@@ -41,16 +42,27 @@
     };
   }
 
-  /* ---------------- bodies ---------------- */
-  /* They always arrive standing on the floor — never dropped in from above. */
+  /* ---------------- bodies ----------------
+     A figure is either standing on the floor minding its own business, or it
+     is a ragdoll. Grabbing one, or being hit by one, turns it into the other. */
   function spawnBody(S, lab) {
-    const x = rnd(34, W - 34);
-    const y = 1;
-    const rd = SL.gore.makeRagdoll(x, y, {
-      vx: rnd(-8, 8), vy: 0,
+    const fig = {
+      x: rnd(34, W - 34), vx: 0, facing: Math.random() < 0.5 ? -1 : 1,
+      phase: rnd(0, 6.28), wanderT: rnd(0.6, 3),
       colour: SKINS[(Math.random() * SKINS.length) | 0],
-      hat: HATS[(Math.random() * HATS.length) | 0],
-      alive: false
+      hat: HATS[(Math.random() * HATS.length) | 0]
+    };
+    lab.standing.push(fig);
+    return fig;
+  }
+
+  /** A standing figure gives way and becomes a ragdoll. */
+  function toLimp(S, lab, fig, vx, vy) {
+    const i = lab.standing.indexOf(fig);
+    if (i >= 0) lab.standing.splice(i, 1);
+    const rd = SL.gore.makeRagdoll(fig.x, 0.5, {
+      vx: vx || 0, vy: vy || 0,
+      colour: fig.colour, hat: fig.hat, alive: false
     });
     rd.hp = 100;
     rd.restT = 0;
@@ -59,7 +71,48 @@
     rd.bornT = lab.t;
     rd.onSmash = (impact, p, plat) => onSmash(S, lab, rd, impact, p, plat);
     lab.bodies.push(rd);
+    SL.audio.play('squelch');
     return rd;
+  }
+
+  function stepStanding(lab, dt) {
+    for (const f of lab.standing) {
+      f.wanderT -= dt;
+      if (f.wanderT <= 0) {
+        f.wanderT = rnd(1.2, 4);
+        f.vx = Math.random() < 0.45 ? 0 : rnd(16, 34) * (Math.random() < 0.5 ? -1 : 1);
+      }
+      if (f.vx) {
+        f.x += f.vx * dt;
+        f.facing = f.vx < 0 ? -1 : 1;
+        if (f.x < 16) { f.x = 16; f.vx = Math.abs(f.vx); }
+        if (f.x > W - 16) { f.x = W - 16; f.vx = -Math.abs(f.vx); }
+        f.phase += Math.abs(f.vx) * dt * 0.075;
+      } else {
+        f.phase += dt * 2.2;
+      }
+    }
+  }
+
+  /* anything flying through a standing figure knocks it flat */
+  function checkKnockovers(S, lab) {
+    if (!lab.standing.length) return;
+    for (let i = lab.standing.length - 1; i >= 0; i--) {
+      const f = lab.standing[i];
+      let hit = null;
+      for (const rd of lab.bodies) {
+        for (const p of rd.pts) {
+          const vx = (p.x - p.px) * 120, vy = (p.y - p.py) * 120;
+          if (Math.hypot(vx, vy) < 150) continue;
+          if (Math.abs(p.x - f.x) > 15) continue;
+          if (p.y < -3 || p.y > 34) continue;
+          hit = { vx: vx * 0.55, vy: Math.max(40, vy * 0.4) };
+          break;
+        }
+        if (hit) break;
+      }
+      if (hit) toLimp(S, lab, f, hit.vx, hit.vy);
+    }
   }
 
   function onSmash(S, lab, rd, impact, p, plat) {
@@ -100,7 +153,7 @@
   function start(S) {
     S.level = buildArena(S);
     S.lab = {
-      bodies: [], pops: [], earned: 0, pending: 0, banked: 0,
+      bodies: [], standing: [], pops: [], earned: 0, pending: 0, banked: 0,
       combo: 0, comboT: 0, grab: null, t: 0, spawnT: 0
     };
     SL.gore.reset(S);
@@ -142,10 +195,13 @@
       }
     }
 
+    stepStanding(lab, dt);
+    checkKnockovers(S, lab);
+
     /* keep the room stocked */
     lab.spawnT -= dt;
-    if (lab.bodies.length < POP && lab.spawnT <= 0) {
-      lab.spawnT = 0.7;
+    if (lab.bodies.length + lab.standing.length < POP && lab.spawnT <= 0) {
+      lab.spawnT = 0.9;
       spawnBody(S, lab);
     }
 
@@ -169,6 +225,26 @@
   function grabAt(S, wx, wy) {
     const lab = S.lab;
     if (!lab) return false;
+
+    /* grab someone still on their feet and they go down */
+    let fig = null, figD = 26 * 26;
+    for (const f of lab.standing) {
+      const dx = f.x - wx, dy = clamp(wy, 0, 30) - wy;
+      const d = dx * dx + dy * dy;
+      if (wy > -6 && wy < 40 && d < figD) { figD = d; fig = f; }
+    }
+    if (fig) {
+      const rd = toLimp(S, lab, fig, 0, 0);
+      let bi = 0, bd = Infinity;
+      for (let i = 0; i < rd.pts.length; i++) {
+        const p = rd.pts[i];
+        const d = (p.x - wx) * (p.x - wx) + (p.y - wy) * (p.y - wy);
+        if (d < bd) { bd = d; bi = i; }
+      }
+      lab.grab = { rd, i: bi, x: wx, y: wy };
+      return true;
+    }
+
     let best = null, bestD = GRAB_RADIUS * GRAB_RADIUS;
     for (const rd of lab.bodies) {
       for (let i = 0; i < rd.pts.length; i++) {
@@ -191,6 +267,31 @@
   }
   const isGrabbing = (S) => !!(S.lab && S.lab.grab);
 
+  /** Wipe the room: bodies, blood, giblets, the lot. */
+  function clearRoom(S) {
+    const lab = S.lab;
+    if (!lab) return 0;
+    const n = lab.bodies.length + lab.standing.length;
+    lab.bodies.length = 0;
+    lab.standing.length = 0;
+    lab.pops.length = 0;
+    lab.grab = null;
+    SL.gore.reset(S);
+    SL.audio.play('back');
+    return n;
+  }
+
+  /** Put one more on their feet, on demand. */
+  function addOne(S) {
+    const lab = S.lab;
+    if (!lab) return false;
+    if (lab.bodies.length + lab.standing.length >= MAX_BODIES) { SL.audio.play('nope'); return false; }
+    spawnBody(S, lab);
+    SL.audio.play('ui');
+    return true;
+  }
+  const population = (S) => (S.lab ? S.lab.bodies.length + S.lab.standing.length : 0);
+
   /* ---------------- drawing ---------------- */
   function draw(ctx, S, toY, t) {
     const lab = S.lab;
@@ -208,6 +309,15 @@
       ctx.restore();
     }
 
+    for (const f of lab.standing) {
+      ctx.save();
+      ctx.translate(f.x, toY(0));
+      SL.stick.draw(ctx, {
+        skin: null, hat: f.hat, colour: f.colour,
+        pose: f.vx ? 'run' : 'idle', phase: f.phase, facing: f.facing, t
+      });
+      ctx.restore();
+    }
     for (const rd of lab.bodies) SL.gore.drawRagdoll(ctx, rd, toY, t);
 
     for (const pop of lab.pops) {
@@ -223,5 +333,5 @@
     ctx.globalAlpha = 1;
   }
 
-  SL.lab = { start, step, draw, grabAt, moveGrab, release, isGrabbing, POP, CEILING };
+  SL.lab = { start, step, draw, grabAt, moveGrab, release, isGrabbing, clearRoom, addOne, population, POP, MAX_BODIES, CEILING };
 })(window.SL);

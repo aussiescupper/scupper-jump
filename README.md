@@ -82,10 +82,14 @@ Settings has a **Gore** tab with two independent switches:
 
 ### Smash Lab
 
-A plain padded room — floor, two walls, a ceiling, nothing else. Five stick figures stand about on
-the floor. Grab one with a finger or the mouse, fling it at a surface, and you get paid for the
-damage. Bodies restock themselves and the blood stays on the walls. Every control is hidden here;
-there is nothing to drive.
+A plain padded room — floor, two walls, a ceiling, nothing else. Stick figures **stand about on
+the floor** and wander a little. Grab one with a finger or the mouse and it drops into a ragdoll on
+the spot; fling it at a surface and you get paid for the damage. Throw one **through** the others
+and they all go down like skittles.
+
+**Spawn** and **Clear** sit top right, clear of the floor where everything happens. Spawn tops the
+room up to fourteen; Clear wipes the bodies, the giblets and every stain. The movement controls are
+hidden in here — there is nothing to drive.
 
 The bodies are the same Verlet ragdoll as everywhere else, so they come apart and bleed on a hard
 enough hit. Payouts are rate-limited to one per body per wallop and capped per body — without that
