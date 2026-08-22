@@ -186,13 +186,14 @@
       }
       /* Follow the carnage down, but only so far. Off the top of a tall tower
          the body would otherwise drag the camera thousands of pixels and take
-         fifteen seconds about it — so past CHASE_LIMIT the camera stops, the
-         body falls out of shot, and once it is gone it is deleted. */
+         fifteen seconds about it — so past CHASE_LIMIT the camera stops and the
+         body drops out of shot. It is retired rather than deleted: it carries on
+         falling under stepOld and is waiting for you at the bottom. */
       if (S.gore.rd) {
         const stopAt = (S.deathY || 0) - CHASE_LIMIT;
         const want = clamp(SL.gore.focus(S) - R.view.h * 0.42, Math.max(MIN_CAM, stopAt), 1e9);
         S.camY = damp(S.camY, want, 3.2, dt);
-        if (SL.gore.topOf(S) < S.camY - 90) SL.gore.vanish(S);
+        if (SL.gore.topOf(S) < S.camY - 90) SL.gore.retire(S);
       }
       return;
     }
