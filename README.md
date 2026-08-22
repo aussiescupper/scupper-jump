@@ -220,6 +220,11 @@ from any sub-path.
   are still inside GitHub Pages' `max-age=600` window — without that, bumping `VERSION` can
   silently do nothing for ten minutes after a deploy.
 * Icons are generated PNGs (192/512 plus maskable variants and an Apple touch icon).
+* Audio is synthesised from plain voice specs, which means the same specs can be rendered into an
+  `OfflineAudioContext` and measured. `SL.audio.measure(name)` returns the peak and RMS of any
+  effect — that is how the levels were set rather than by ear. Settings → Sound has a **Test**
+  button that reports the live context state, for when a device is silencing the page.
+* On iOS the hardware mute switch silences web audio outright, whatever the in-game settings say.
 * Progress lives in `localStorage` under `scupperlab.jump.v1`.
 
 ## Layout

@@ -63,6 +63,8 @@
 
   /* ---------------- title ---------------- */
   function refreshTitle() {
+    const v = $('#title-version');
+    if (v) v.textContent = SL.VERSION || '';
     const next = SL.save.data.unlocked;
     $('#btn-play-label').textContent = next > 1 ? ('Continue · Level ' + next) : 'Play';
     const best = SL.save.endlessBest();
@@ -259,6 +261,17 @@
     });
     setTab(settingsTab);
     $('#set-version').textContent = SL.VERSION || '1.0.0';
+    refreshAudioState();
+  }
+
+  function refreshAudioState() {
+    const n = $('#audio-state');
+    if (!n) return;
+    const a = SL.audio.state();
+    n.textContent = !a.supported ? 'not supported by this browser'
+      : a.ctx === 'running' ? 'running at ' + Math.round(a.sampleRate / 1000) + 'kHz'
+      : a.started ? 'starting (' + a.ctx + ') — tap Test'
+      : 'not started yet — tap Test';
   }
 
   /* ---------------- HUD ---------------- */
@@ -531,6 +544,16 @@
         SL.audio.applySettings();
         SL.audio.play('ui');
       });
+    });
+
+    const testBtn = $('#btn-test-sound');
+    if (testBtn) testBtn.addEventListener('click', () => {
+      SL.audio.unlock();
+      SL.save.setSetting('sfx', true);
+      $('#set-sfx').checked = true;
+      SL.audio.applySettings();
+      SL.audio.play('win');
+      setTimeout(refreshAudioState, 250);
     });
 
     $('#btn-reset').addEventListener('click', () => {

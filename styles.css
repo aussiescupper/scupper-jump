@@ -14,8 +14,8 @@
   --bad:#ff5d6c;
   --gold:#ffd166;
   --r:16px;
-  --tap:clamp(72px,22vw,92px);
-  --tap-jump:clamp(76px,23.5vw,98px);
+  --tap:clamp(76px, calc(var(--col-w, 100vw) * 0.25), 180px);
+  --tap-jump:clamp(88px, calc(var(--col-w, 100vw) * 0.29), 205px);
   --safe-t:env(safe-area-inset-top,0px);
   --safe-b:env(safe-area-inset-bottom,0px);
   --safe-l:env(safe-area-inset-left,0px);
@@ -95,9 +95,9 @@ body{
   /* stacked above the jump button, which leaves the whole middle free for
      move buttons big enough to actually hit */
   position:absolute;
-  right:calc(18px + var(--safe-r) + (var(--tap-jump) - clamp(46px,13.5vw,56px)) / 2);
+  right:calc(18px + var(--safe-r) + (var(--tap-jump) - clamp(50px, calc(var(--col-w, 100vw) * 0.13), 96px)) / 2);
   bottom:calc(34px + var(--safe-b) + var(--tap-jump));
-  width:clamp(46px,13.5vw,56px);height:clamp(46px,13.5vw,56px);
+  width:clamp(50px, calc(var(--col-w, 100vw) * 0.13), 96px);height:clamp(50px, calc(var(--col-w, 100vw) * 0.13), 96px);
   border-radius:50%;pointer-events:auto;cursor:pointer;padding:0;
   background:rgba(233,238,251,.09);border:2px solid rgba(233,238,251,.26);
   display:grid;place-items:center;transition:transform .08s,background .12s,border-color .12s;

@@ -1,25 +1,144 @@
-/* Scupper Jump — everything synthesised, nothing downloaded */
+/* Scupper Jump — every sound synthesised, nothing downloaded.
+   Voices are plain data so the exact same specs can be rendered into an
+   OfflineAudioContext and measured, rather than trusted by ear. */
 (function (SL) {
   'use strict';
 
   let ctx = null, master = null, sfxBus = null, musicBus = null;
-  let started = false, musicTimer = 0, musicStep = 0;
+  let started = false, musicTimer = 0, musicStep = 0, prime = null;
 
+  /* ---------------- voice specs ----------------
+     gain is the voice's peak into its bus. These are deliberately loud: the
+     previous set peaked around 0.07 of full scale and was inaudible on a
+     tablet speaker. */
+  const KIT = {
+    jump:    [{ type: 'square',   f: 330,  f2: 720,  dur: 0.11, gain: 0.55 }],
+    djump:   [{ type: 'triangle', f: 520,  f2: 980,  dur: 0.12, gain: 0.6 }],
+    land:    [{ noise: true, dur: 0.09, gain: 1.0, lp: 1900, lpTo: 320 }],
+    step:    [{ noise: true, dur: 0.04, gain: 0.3, lp: 2600, lpTo: 1200 }],
+    coin:    [{ type: 'square',   f: 988,  dur: 0.055, gain: 0.5 },
+              { type: 'square',   f: 1319, dur: 0.11, gain: 0.5, delay: 0.05 }],
+    gem:     [{ type: 'triangle', f: 880,  dur: 0.13, gain: 0.42 },
+              { type: 'triangle', f: 1175, dur: 0.13, gain: 0.42, delay: 0.055 },
+              { type: 'triangle', f: 1568, dur: 0.13, gain: 0.42, delay: 0.11 },
+              { type: 'triangle', f: 2093, dur: 0.17, gain: 0.42, delay: 0.165 }],
+    spring:  [{ type: 'sine',     f: 200,  f2: 1250, dur: 0.26, gain: 0.7 }],
+    crumble: [{ noise: true, dur: 0.3,  gain: 1.4, lp: 3000, lpTo: 420 }],
+    shield:  [{ type: 'sawtooth', f: 760,  f2: 220,  dur: 0.24, gain: 0.5 },
+              { noise: true, dur: 0.2, gain: 0.85, lp: 3200, lpTo: 620 }],
+    splat:   [{ noise: true, dur: 0.34, gain: 1.25, lp: 3000, lpTo: 260 },
+              { type: 'sawtooth', f: 180, f2: 48, dur: 0.3, gain: 0.5 }],
+    squelch: [{ noise: true, dur: 0.16, gain: 1.5, lp: 2200, lpTo: 380 }],
+    die:     [{ type: 'sawtooth', f: 440, f2: 60, dur: 0.45, gain: 0.45 },
+              { noise: true, dur: 0.3, gain: 0.9, lp: 1900, lpTo: 200 }],
+    hurt:    [{ type: 'square',   f: 230,  f2: 95,  dur: 0.2, gain: 0.7 }],
+    win:     [{ type: 'triangle', f: 523,  dur: 0.26, gain: 0.55 },
+              { type: 'triangle', f: 659,  dur: 0.26, gain: 0.55, delay: 0.09 },
+              { type: 'triangle', f: 784,  dur: 0.26, gain: 0.55, delay: 0.18 },
+              { type: 'triangle', f: 1047, dur: 0.3,  gain: 0.55, delay: 0.27 },
+              { type: 'triangle', f: 1319, dur: 0.38, gain: 0.6,  delay: 0.36 }],
+    star:    [{ type: 'triangle', f: 1568, f2: 2093, dur: 0.18, gain: 0.62 }],
+    ui:      [{ type: 'sine',     f: 660,  dur: 0.055, gain: 0.42 }],
+    back:    [{ type: 'sine',     f: 400,  dur: 0.065, gain: 0.42 }],
+    buy:     [{ type: 'triangle', f: 784,  dur: 0.2,  gain: 0.5 },
+              { type: 'triangle', f: 1047, dur: 0.2,  gain: 0.5, delay: 0.065 },
+              { type: 'triangle', f: 1319, dur: 0.26, gain: 0.55, delay: 0.13 }],
+    nope:    [{ type: 'square',   f: 170,  f2: 110, dur: 0.17, gain: 0.65 }],
+    check:   [{ type: 'triangle', f: 660,  dur: 0.11, gain: 0.5 },
+              { type: 'triangle', f: 990,  dur: 0.17, gain: 0.5, delay: 0.095 }]
+  };
+
+  /* ---------------- rendering ----------------
+     Works against any BaseAudioContext, which is what lets the test suite
+     render these offline and check they are not silent. */
+  /* Gentle saturation instead of a compressor: near-linear below half scale,
+     rounds off above it. A DynamicsCompressor mangled short blips — a 50ms UI
+     click measured three times quieter through one. */
+  function softClip(actx) {
+    const n = 1024, curve = new Float32Array(n);
+    const k = 1.7, norm = Math.tanh(k);
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1)) * 2 - 1;
+      curve[i] = Math.tanh(k * x) / norm;
+    }
+    const ws = actx.createWaveShaper();
+    ws.curve = curve;
+    ws.oversample = '2x';
+    return ws;
+  }
+
+  function noiseBuffer(actx) {
+    if (actx.__slNoise) return actx.__slNoise;
+    const b = actx.createBuffer(1, Math.floor(actx.sampleRate * 0.5), actx.sampleRate);
+    const d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    actx.__slNoise = b;
+    return b;
+  }
+
+  function voice(actx, dest, o, at) {
+    const t0 = at + (o.delay || 0);
+    const g = actx.createGain();
+    const peak = o.gain == null ? 0.5 : o.gain;
+    /* fast attack, exponential tail — punchier than a symmetric ramp */
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(peak, t0 + Math.min(0.008, o.dur * 0.2));
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + o.dur);
+    g.connect(dest);
+
+    if (o.noise) {
+      const src = actx.createBufferSource();
+      src.buffer = noiseBuffer(actx);
+      const f = actx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.setValueAtTime(o.lp || 1200, t0);
+      if (o.lpTo) f.frequency.exponentialRampToValueAtTime(Math.max(60, o.lpTo), t0 + o.dur);
+      src.connect(f).connect(g);
+      src.start(t0); src.stop(t0 + o.dur + 0.02);
+    } else {
+      const osc = actx.createOscillator();
+      osc.type = o.type || 'square';
+      osc.frequency.setValueAtTime(o.f, t0);
+      if (o.f2) osc.frequency.exponentialRampToValueAtTime(Math.max(1, o.f2), t0 + o.dur);
+      osc.connect(g);
+      osc.start(t0); osc.stop(t0 + o.dur + 0.02);
+    }
+  }
+
+  /* ---------------- live context ---------------- */
   function init() {
     if (ctx) return ctx;
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
-    ctx = new AC();
-    master = ctx.createGain(); master.gain.value = 0.9; master.connect(ctx.destination);
-    sfxBus = ctx.createGain(); sfxBus.gain.value = 0.55; sfxBus.connect(master);
-    musicBus = ctx.createGain(); musicBus.gain.value = 0.0; musicBus.connect(master);
+    try { ctx = new AC(); } catch (e) { return null; }
+    master = ctx.createGain(); master.gain.value = 0.9;
+    master.connect(softClip(ctx)).connect(ctx.destination);
+    sfxBus = ctx.createGain(); sfxBus.gain.value = 1; sfxBus.connect(master);
+    musicBus = ctx.createGain(); musicBus.gain.value = 0; musicBus.connect(master);
     return ctx;
+  }
+
+  /* iOS will not start WebAudio until an element has played inside a gesture,
+     and drops the session again when the page is backgrounded. */
+  const SILENT = 'data:audio/wav;base64,UklGRvQHAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YdAHAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==';
+  function primeElement() {
+    if (prime) { prime.play().catch(() => {}); return; }
+    try {
+      prime = document.createElement('audio');
+      prime.src = SILENT;
+      prime.loop = true;
+      prime.volume = 0.001;
+      prime.setAttribute('playsinline', '');
+      prime.playsInline = true;
+      prime.play().catch(() => {});
+    } catch (e) { /* ignore */ }
   }
 
   function unlock() {
     init();
     if (!ctx) return;
-    if (ctx.state === 'suspended') ctx.resume();
+    primeElement();
+    if (ctx.state !== 'running') { try { ctx.resume(); } catch (e) { /* ignore */ } }
     started = true;
     applySettings();
   }
@@ -27,94 +146,78 @@
   function applySettings() {
     if (!ctx) return;
     const s = SL.save.data.settings;
-    sfxBus.gain.setTargetAtTime(s.sfx ? 0.55 : 0, ctx.currentTime, 0.02);
-    musicBus.gain.setTargetAtTime(s.music ? 0.15 : 0, ctx.currentTime, 0.05);
+    sfxBus.gain.setTargetAtTime(s.sfx ? 1 : 0, ctx.currentTime, 0.02);
+    musicBus.gain.setTargetAtTime(s.music ? 0.3 : 0, ctx.currentTime, 0.05);
     if (s.music) startMusic(); else stopMusic();
   }
 
-  /* ---- primitives ---- */
-  function tone(o) {
-    if (!ctx || !started) return;
-    const t0 = ctx.currentTime + (o.delay || 0);
-    const osc = ctx.createOscillator();
-    const g = ctx.createGain();
-    osc.type = o.type || 'square';
-    osc.frequency.setValueAtTime(o.f, t0);
-    if (o.f2) osc.frequency.exponentialRampToValueAtTime(Math.max(1, o.f2), t0 + o.dur);
-    const peak = o.gain == null ? 0.5 : o.gain;
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(peak, t0 + Math.min(0.012, o.dur * 0.25));
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + o.dur);
-    osc.connect(g).connect(o.bus || sfxBus);
-    osc.start(t0); osc.stop(t0 + o.dur + 0.02);
-  }
-
-  let noiseBuf = null;
-  function noise(dur, gain, filterHz, sweepTo) {
-    if (!ctx || !started) return;
-    if (!noiseBuf) {
-      noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 0.5, ctx.sampleRate);
-      const d = noiseBuf.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    }
-    const t0 = ctx.currentTime;
-    const src = ctx.createBufferSource(); src.buffer = noiseBuf;
-    const f = ctx.createBiquadFilter(); f.type = 'lowpass';
-    f.frequency.setValueAtTime(filterHz, t0);
-    if (sweepTo) f.frequency.exponentialRampToValueAtTime(Math.max(60, sweepTo), t0 + dur);
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(gain, t0);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    src.connect(f).connect(g).connect(sfxBus);
-    src.start(t0); src.stop(t0 + dur);
-  }
-
-  /* ---- the kit ---- */
-  const KIT = {
-    jump:    () => tone({ type: 'square',   f: 340, f2: 660, dur: 0.10, gain: 0.28 }),
-    djump:   () => tone({ type: 'triangle', f: 520, f2: 900, dur: 0.11, gain: 0.30 }),
-    land:    () => noise(0.07, 0.16, 900, 200),
-    step:    () => noise(0.03, 0.05, 1400, 700),
-    coin:    () => { tone({ type: 'square', f: 988, dur: 0.05, gain: 0.20 }); tone({ type: 'square', f: 1319, dur: 0.10, gain: 0.20, delay: 0.045 }); },
-    gem:     () => { [880, 1175, 1568, 2093].forEach((f, i) => tone({ type: 'triangle', f, dur: 0.14, gain: 0.18, delay: i * 0.05 })); },
-    spring:  () => tone({ type: 'sine', f: 200, f2: 1200, dur: 0.24, gain: 0.34 }),
-    crumble: () => noise(0.28, 0.13, 2200, 260),
-    shield:  () => { tone({ type: 'sawtooth', f: 700, f2: 220, dur: 0.22, gain: 0.24 }); noise(0.18, 0.12, 2600, 400); },
-    splat:   () => { noise(0.34, 0.34, 2800, 180); tone({ type: 'sawtooth', f: 170, f2: 48, dur: 0.3, gain: 0.24 }); },
-    squelch: () => noise(0.14, 0.16, 1400, 260),
-    die:     () => { tone({ type: 'sawtooth', f: 420, f2: 60, dur: 0.45, gain: 0.28 }); noise(0.3, 0.14, 1200, 120); },
-    hurt:    () => tone({ type: 'square', f: 200, f2: 90, dur: 0.18, gain: 0.3 }),
-    win:     () => { [523, 659, 784, 1047, 1319].forEach((f, i) => tone({ type: 'triangle', f, dur: 0.26, gain: 0.24, delay: i * 0.085 })); },
-    star:    () => tone({ type: 'triangle', f: 1568, f2: 2093, dur: 0.16, gain: 0.2 }),
-    ui:      () => tone({ type: 'sine', f: 620, dur: 0.045, gain: 0.16 }),
-    back:    () => tone({ type: 'sine', f: 380, dur: 0.05, gain: 0.14 }),
-    buy:     () => { [784, 1047, 1319].forEach((f, i) => tone({ type: 'triangle', f, dur: 0.2, gain: 0.2, delay: i * 0.06 })); },
-    nope:    () => tone({ type: 'square', f: 150, f2: 110, dur: 0.14, gain: 0.2 }),
-    check:   () => { tone({ type: 'triangle', f: 660, dur: 0.1, gain: 0.2 }); tone({ type: 'triangle', f: 990, dur: 0.16, gain: 0.2, delay: 0.09 }); }
-  };
-
   function play(name) {
     if (!started || !SL.save.data.settings.sfx) return;
-    const fn = KIT[name];
-    if (fn) { try { fn(); } catch (e) { /* audio can die on some devices; never break the game */ } }
+    const spec = KIT[name];
+    if (!spec || !ctx) return;
+    /* a suspended context silently swallows everything — try again, cheaply */
+    if (ctx.state !== 'running') { try { ctx.resume(); } catch (e) { /* ignore */ } }
+    try {
+      const at = ctx.currentTime;
+      for (const v of spec) voice(ctx, sfxBus, v, at);
+    } catch (e) { /* never let audio break the game */ }
   }
 
-  /* ---- sparse ambient arpeggio ---- */
-  const SCALE = [0, 3, 5, 7, 10, 12, 15, 12, 10, 7, 5, 3];
+  /* ---------------- music ----------------
+     Short plucks in a mid register. The old bed held a 65Hz sine for 1.1s at a
+     time, which had more sustained energy than the effects did and read as a
+     hum that masked them. */
+  const SCALE = [0, 4, 7, 11, 12, 11, 7, 4];
   function startMusic() {
     if (musicTimer || !ctx) return;
     musicStep = 0;
     musicTimer = setInterval(() => {
-      if (!SL.save.data.settings.music || !started) return;
-      const root = 130.81;                       // C3
+      if (!SL.save.data.settings.music || !started || !ctx) return;
+      const root = 261.63;                       // C4, well clear of the mud
       const semi = SCALE[musicStep % SCALE.length];
       const f = root * Math.pow(2, semi / 12);
-      tone({ type: 'triangle', f, dur: 0.55, gain: 0.5, bus: musicBus });
-      if (musicStep % 4 === 0) tone({ type: 'sine', f: f / 2, dur: 1.1, gain: 0.4, bus: musicBus });
+      try {
+        voice(ctx, musicBus, { type: 'triangle', f, dur: 0.26, gain: 0.5 }, ctx.currentTime);
+        if (musicStep % 8 === 0) {
+          voice(ctx, musicBus, { type: 'sine', f: f / 2, dur: 0.3, gain: 0.35 }, ctx.currentTime);
+        }
+      } catch (e) { /* ignore */ }
       musicStep++;
-    }, 340);
+    }, 360);
   }
   function stopMusic() { clearInterval(musicTimer); musicTimer = 0; }
 
-  SL.audio = { unlock, play, applySettings, get ready() { return started; } };
+  /* ---------------- diagnostics ---------------- */
+  function state() {
+    return {
+      supported: !!(window.AudioContext || window.webkitAudioContext),
+      started,
+      ctx: ctx ? ctx.state : 'none',
+      sampleRate: ctx ? ctx.sampleRate : 0,
+      sfx: !!SL.save.data.settings.sfx,
+      music: !!SL.save.data.settings.music
+    };
+  }
+
+  /** Render one effect offline and report its level — used by the tests. */
+  function measure(name, seconds) {
+    const spec = KIT[name];
+    if (!spec) return Promise.resolve(null);
+    const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!OC) return Promise.resolve(null);
+    const oc = new OC(1, Math.floor(44100 * (seconds || 1.2)), 44100);
+    const m = oc.createGain(); m.gain.value = 0.9;
+    m.connect(softClip(oc)).connect(oc.destination);
+    const b = oc.createGain(); b.gain.value = 1; b.connect(m);
+    for (const v of spec) voice(oc, b, v, 0);
+    return oc.startRendering().then((buf) => {
+      const d = buf.getChannelData(0);
+      let peak = 0, sum = 0;
+      for (let i = 0; i < d.length; i++) { const a = Math.abs(d[i]); if (a > peak) peak = a; sum += a * a; }
+      return { name, peak: +peak.toFixed(4), rms: +Math.sqrt(sum / d.length).toFixed(5) };
+    });
+  }
+
+  SL.audio = { unlock, play, applySettings, state, measure, names: () => Object.keys(KIT),
+    get ready() { return started; } };
 })(window.SL);
