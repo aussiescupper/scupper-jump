@@ -16,14 +16,12 @@
   const COYOTE = 0.10, BUFFER = 0.13;
   const MAX_FALL = 1250;
   const MIN_JUMP_V = 505;          // a tap still clears the smallest gap in the tower
-  const TRIP_SPEED = 980;          // landing faster than this and his legs go out from under him
-  const TRIP_TIME = 0.8;
   const CRUMBLE_TIME = 0.42;
   const CRUMBLE_REGEN = 3.0;       // a collapsed block rebuilds, so a missed jump can never strand you
   const CHASE_LIMIT = 700;         // how far the camera will follow a body down before giving up
   const BOUNCE_MUL = 1.62;
 
-  const input = { left: false, right: false, jump: false, jumpEdge: false, jumpHeld: false };
+  const input = { left: false, right: false, jump: false, jumpEdge: false, jumpHeld: false, attack: false, attackEdge: false };
   const held = { key: {}, touch: {} };
 
   const S = {
@@ -32,12 +30,12 @@
     time: 0, camY: MIN_CAM, baseCam: MIN_CAM, anchor: 0, followGap: 260,
     player: null, mods: null,
     run: null,               // per-attempt bookkeeping
-    shield: false, checkpoint: null, limp: false, lab: null,
+    shield: false, checkpoint: null, limp: false, lab: null, arena: null,
     awaitRetry: false, deathCause: null,
     hudDirty: true
   };
 
-  const listeners = { hud: [], complete: [], toast: [], retry: [], limp: [], endless: [] };
+  const listeners = { hud: [], complete: [], toast: [], retry: [], limp: [], endless: [], arena: [] };
   const on = (k, fn) => listeners[k].push(fn);
   const fire = (k, p) => listeners[k].forEach(fn => fn(p));
 
@@ -46,7 +44,7 @@
     return {
       x, y, w: PW, h: PH, vx: 0, vy: 0,
       onGround: false, coyote: 0, buffer: 0, jumpsLeft: 0, cutJump: false,
-      facing: 1, pose: 'idle', animPhase: 0, squash: 1, tripT: 0, rot: 0,
+      facing: 1, pose: 'idle', animPhase: 0, squash: 1, rot: 0,
       trail: [], trailT: 0,
       dead: false, deadT: 0, invuln: 0, ride: null, wallDir: 0
     };
@@ -64,6 +62,7 @@
     };
     S.checkpoint = null;
     S.lab = null;
+    S.arena = null;
     SL.gore.reset(S);
     resetAttempt(true);
     S.mode = mode || 'play';
@@ -102,9 +101,12 @@
     const l = held.key.left || held.touch.left;
     const r = held.key.right || held.touch.right;
     const j = held.key.jump || held.touch.jump;
+    const a = held.key.attack || held.touch.attack;
     input.left = !!l; input.right = !!r;
     if (j && !input.jumpHeld) input.jumpEdge = true;
     input.jumpHeld = !!j;
+    if (a && !input.attack) input.attackEdge = true;
+    input.attack = !!a;
   }
 
   function setKey(name, down) {
@@ -139,6 +141,11 @@
     /* previous corpses keep settling while you climb, so one retired mid-fall
        finishes its tumble instead of hanging in the air */
     SL.gore.stepOld(S, dt);
+
+    if (S.run.arena) {
+      if (input.attackEdge) { input.attackEdge = false; SL.arena.playerAttack(S); }
+      SL.arena.step(S, dt);
+    }
 
     /* animate platform states regardless of player */
     for (const p of lv.plats) {
@@ -202,8 +209,7 @@
     if (S.mode === 'play' && S.run.started) S.run.elapsed += dt;
     if (pl.invuln > 0) pl.invuln -= dt;
 
-    if (pl.tripT > 0) pl.tripT = Math.max(0, pl.tripT - dt);
-    const active = S.mode === 'play' && pl.tripT <= 0;
+    const active = S.mode === 'play';
     const dirX = active ? ((input.right ? 1 : 0) - (input.left ? 1 : 0)) : 0;
 
     /* -------- horizontal -------- */
@@ -218,7 +224,7 @@
       pl.facing = dirX;
     } else {
       const s = Math.sign(pl.vx);
-      pl.vx -= s * (pl.tripT > 0 ? fric * 1.6 : fric) * dt;
+      pl.vx -= s * fric * dt;
       if (Math.sign(pl.vx) !== s) pl.vx = 0;
     }
 
@@ -305,21 +311,16 @@
           pl.cutJump = true;
           SL.audio.play('spring');
           R.burst(pl.hx || (best.x + best.w / 2), best.y, 14, { c: '#3ddc97', dir: -Math.PI / 2, spread: 1.4, speed: 190, g: 380, r: 3, life: 0.5 });
-        } else if (best.type === 'goal') {
+        } else if (best.type === 'goal' && !S.run.arena) {
           return win();
         } else {
           if (!wasGround && impact > 120) {
             pl.squash = clamp(1 - impact / 3400, 0.62, 0.95);
             SL.audio.play('land');
-            /* come down hard enough and his legs go out from under him */
-            const tripAt = TRIP_SPEED * (1 + SL.save.tier('grip') * 0.18);
-            if (impact > tripAt && best.type !== 'ice') {
-              pl.tripT = TRIP_TIME;
-              pl.buffer = 0;
-              SL.audio.play('squelch');
-              SL.util.vibrate(SL.save.data.settings.haptic ? [12, 30, 12] : 0);
+            /* a hard landing just thumps — no stumble, no getting up */
+            if (impact > 900) {
+              SL.util.vibrate(SL.save.data.settings.haptic ? 10 : 0);
               R.burst(pl.x + PW / 2, pl.y, 9, { c: 'rgba(255,255,255,.5)', dir: -Math.PI / 2, spread: 2.8, speed: 110, g: 420, r: 2.6, life: 0.4 });
-              fire('toast', 'Tripped!');
             }
             if (impact > 380) {
               R.burst(pl.x + PW / 2, pl.y, 7, { c: 'rgba(255,255,255,.55)', dir: -Math.PI / 2, spread: 2.6, speed: 90, g: 400, r: 2.4, life: 0.35 });
@@ -417,6 +418,12 @@
        the floor with you, and kill you on the way back down through your own
        launch pad. The view may rise above that floor to keep you in shot, and
        slides back down as you fall. */
+    if (S.run.arena) {                       // the pit is one screen; hold the camera
+      S.baseCam = MIN_CAM; S.camY = MIN_CAM;
+      pl.squash = damp(pl.squash, 1, 13, dt);
+      arenaPose(pl, dt);
+      return;
+    }
     let base = S.anchor - S.followGap;
     if (S.run.endless) base = Math.max(base, S.rising);
     if (base > S.baseCam) S.baseCam = damp(S.baseCam, base, 6.5, dt);
@@ -428,13 +435,7 @@
 
     /* -------- animation -------- */
     pl.squash = damp(pl.squash, 1, 13, dt);
-    if (pl.tripT > 0) {
-      pl.pose = 'trip';
-      const p = 1 - pl.tripT / TRIP_TIME;                 // 0 just fallen -> 1 back up
-      const amt = p < 0.22 ? p / 0.22 : (p < 0.68 ? 1 : 1 - (p - 0.68) / 0.32);
-      pl.rot = -pl.facing * 1.25 * clamp(amt, 0, 1);
-      pl.animPhase += dt * 3;
-    } else if (!pl.onGround) { pl.rot = 0; pl.pose = pl.vy > 40 ? 'jump' : 'fall'; }
+    if (!pl.onGround) { pl.rot = 0; pl.pose = pl.vy > 40 ? 'jump' : 'fall'; }
     else if (Math.abs(pl.vx) > 22) { pl.rot = 0; pl.pose = 'run'; pl.animPhase += Math.abs(pl.vx) * dt * 0.075; }
     else { pl.rot = 0; pl.pose = 'idle'; pl.animPhase += dt * 2.2; }
 
@@ -452,6 +453,15 @@
       if (skin.fx === 'sparkle' && Math.random() < 0.22) R.burst(pl.x + PW / 2, pl.y + 15, 1, { c: '#ffe9a8', speed: 25, g: 90, r: 1.8, life: 0.6, jitter: 14 });
       if (skin.fx === 'matrix' && Math.random() < 0.3) R.burst(pl.x + PW / 2, pl.y + 14, 1, { c: '#5cffc1', speed: 15, g: 140, r: 1.8, life: 0.5, jitter: 12, square: true });
     }
+  }
+
+  /* the swing poses take priority over the usual walk cycle */
+  function arenaPose(pl, dt) {
+    const forced = SL.arena.playerPose(S);
+    if (forced) { pl.pose = forced; pl.rot = 0; return; }
+    if (!pl.onGround) { pl.rot = 0; pl.pose = pl.vy > 40 ? 'jump' : 'fall'; }
+    else if (Math.abs(pl.vx) > 22) { pl.rot = 0; pl.pose = 'run'; pl.animPhase += Math.abs(pl.vx) * dt * 0.075; }
+    else { pl.rot = 0; pl.pose = 'idle'; pl.animPhase += dt * 2.2; }
   }
 
   /* ---------------- outcomes ---------------- */
@@ -499,7 +509,7 @@
     S.player.y = Math.max(lowest, 0);
     S.player.vx = 0; S.player.vy = 0;
     S.player.onGround = false;
-    S.player.tripT = 0; S.player.rot = 0;
+    S.player.rot = 0;
   }
 
   function toggleLimp() {
@@ -508,7 +518,6 @@
       S.limp = false;
       syncFromRagdoll();
       SL.gore.softReset(S);
-      S.player.tripT = TRIP_TIME * 0.45;      // a moment to find his feet
       SL.audio.play('land');
     } else {
       S.limp = true;
@@ -592,9 +601,14 @@
     if (!S.level) return;
     const endless = !!(S.run && S.run.endless);
     const lab = !!(S.run && S.run.lab);
+    const arena = !!(S.run && S.run.arena);
     fire('hud', {
       n: S.level.n,
-      endless, lab,
+      endless, lab, arena,
+      hp: arena && S.arena ? S.arena.hp : 0,
+      hpMax: arena && S.arena ? S.arena.hpMax : 1,
+      wave: arena && S.arena ? S.arena.wave : 0,
+      arenaEarned: arena && S.arena ? S.arena.earned : 0,
       labEarned: lab && S.lab ? S.lab.earned : 0,
       labCombo: lab && S.lab ? S.lab.combo : 0,
       labBodies: lab && S.lab ? S.lab.bodies.length : 0,
@@ -672,11 +686,52 @@
       if (!S.player || !S.player.dead || !S.awaitRetry) return false;
       S.awaitRetry = false;
       fire('retry', null);
+      if (S.run && S.run.arena) {                               // the pit shows its own card
+        if (S.arena && S.arena.result) fire('arena', S.arena.result);
+        return true;
+      }
       if (S.run && S.run.endless) { endRun(); return true; }   // one life per run
       respawn();
       return true;
     },
     startEndless() { loadLevel(0, 'play', true); input.jumpEdge = false; },
+
+    /* The fight pit: normal platforming physics, plus everyone else. */
+    startArena() {
+      S.mods = SL.items.modifiers();
+      SL.arena.start(S);
+      S.backdrop = R.makeBackdrop(S.level);
+      S.run = { n: 0, coins: 0, gems: 0, value: 0, deaths: 0, elapsed: 0, collected: 0,
+                replay: false, started: true, halfway: false, endless: false, height: 0,
+                lab: false, arena: true };
+      S.checkpoint = null; S.limp = false; S.awaitRetry = false;
+      fire('retry', null);                    // clear any prompt left over from a previous death
+      S.player = newPlayer(W / 2 - PW / 2, 4);
+      S.anchor = 0; S.baseCam = MIN_CAM; S.camY = MIN_CAM; S.rising = MIN_CAM - 999;
+      S.followGap = followGapFor(1);
+      S.mode = 'play';
+      S.hudDirty = true;
+      input.jumpEdge = false; input.attackEdge = false;
+      pushHud();
+    },
+    fireArena(res) { fire('arena', res); },
+
+    /* Buy your way past a level you are sick of. Marks it cleared at one star
+       so it never counts as a real three-star run. */
+    skipPrice(n) { return 200 + (n || 1) * 30; },
+    canSkip() {
+      return !!(S.run && !S.run.endless && !S.run.lab && !S.run.arena && S.level && S.level.n > 0);
+    },
+    skipLevel() {
+      if (!api.canSkip()) return false;
+      const n = S.level.n;
+      const cost = api.skipPrice(n);
+      if (!SL.save.spend(cost)) return false;
+      SL.save.recordLevel(n, { t: Infinity, d: 99, c: 0, s: 1 });
+      SL.audio.play('buy');
+      api.start(n + 1);
+      return true;
+    },
 
     /* The smash lab: no climbing, no goal, just a room and a wallet. */
     startLab() {
@@ -697,6 +752,7 @@
       /* endless and the lab have no level number to reload — start them afresh */
       const from = S.mode === 'pause' ? S.pausedFrom : S.mode;
       if (from === 'lab') { api.startLab(); return; }
+      if (S.run && S.run.arena) { api.startArena(); return; }
       if (S.run && S.run.endless) { api.startEndless(); return; }
       const n = S.level ? S.level.n : 1;
       S.checkpoint = null;

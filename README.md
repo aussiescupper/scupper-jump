@@ -29,11 +29,6 @@ spot. Press again and he picks himself up wherever he landed — which is not al
 started, since a limp body slides. A live ragdoll never bleeds and never comes apart. Flop into
 the red floor while limp and it counts as a death like any other.
 
-Land from more than about 240px — roughly two platform gaps — and he **trips**, sprawling forward
-with no control for 0.8 s while he gets back up. Long enough to slide off a narrow ledge. A normal
-jump peaks at 139px so routine climbing never triggers it (measured across eight bot-completed
-levels: zero trips). Grip Gloves raise the threshold by 18% per tier.
-
 ### Dying
 
 The stickman is a **Verlet ragdoll** — eleven points (head, chest, hip, elbows, hands, knees,
@@ -90,6 +85,17 @@ Settings has a **Gore** tab with two independent switches:
 | on | off | stays whole, bleeds where he lands |
 | off | off | a clean ragdoll |
 
+### Fight Pit
+
+Waves of stick figures come at you in a small arena. Punch with <kbd>F</kbd> or the fist button;
+jump first and it lands as a heavier kick. They wind up visibly before swinging, so every hit is
+dodgeable. Each one you drop pays out, each wave cleared pays a bonus, and it runs until you are
+knocked out. Your best wave is kept.
+
+It uses the ordinary platformer physics, so moving and jumping feel exactly as they do in a level.
+Payouts are tuned against the other modes: an expert minute earns about 590, against the Smash
+Lab's 495 and a level's 150–350.
+
 ### Smash Lab
 
 A plain padded room — floor, two walls, a ceiling, nothing else. Stick figures **stand about on
@@ -145,6 +151,12 @@ Harbour Lights, Uluru at Dusk, Snowy Peaks, Southern Cross.
 | Guardian | start each attempt with a shield that soaks one hazard |
 | Checkpoint Beacon | respawn at the halfway mark instead of the bottom |
 
+Six **builds** change his shape — Classic, Lanky, Stocky, Absolute Unit, Buff and Pipsqueak —
+altering line weight, limb spread, head size and, on the heavier ones, a gut. These are drawing
+only: the hitbox stays 18×30 whatever you pick, so nothing about the physics or a level's
+difficulty shifts. Enemies in the Fight Pit and the Smash Lab draw from the same set, so a crowd
+is a crowd of different shapes.
+
 Plus ten skins (some with glow, ghosting, sparkle, ember and hue-cycling effects) and eight hats,
 including a cork hat and an Akubra. Everything is drawn live — the shop previews are the same
 renderer that draws the stickman in game.
@@ -154,12 +166,15 @@ renderer that draws the stickman in game.
 | | |
 |---|---|
 | Move | <kbd>A</kbd>/<kbd>D</kbd> or <kbd>←</kbd>/<kbd>→</kbd> |
+| Punch (Fight Pit) | <kbd>F</kbd>, <kbd>X</kbd> or <kbd>Shift</kbd> |
 | Jump | <kbd>Space</kbd>, <kbd>W</kbd> or <kbd>↑</kbd> — **hold for a higher jump** |
 | Go limp / get up | <kbd>R</kbd>, or the stickman button at the bottom of the screen |
 | Pause | <kbd>Esc</kbd> or <kbd>P</kbd> |
 | Mute | <kbd>M</kbd> |
 
-Restarting a level lives in the pause menu — <kbd>R</kbd> is the ragdoll toggle.
+Restarting a level lives in the pause menu — <kbd>R</kbd> is the ragdoll toggle. The pause menu
+also sells a **skip** for the level you are on, at 200 + 30 per level, which marks it cleared at
+one star so it never passes for a real run.
 
 On a touch device an on-screen pad appears automatically. Gamepads work too (left stick / d-pad
 and the bottom face button).

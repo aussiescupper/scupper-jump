@@ -29,13 +29,17 @@
       <div class="hud-chip" id="hud-deaths">☠ <span id="hud-death-n">0</span></div>
       <div class="hud-chip" id="hud-height" hidden><span id="hud-height-n">0</span> m</div>
       <div class="hud-chip" id="hud-lab" hidden><span class="coin-dot"></span>+<span id="hud-lab-n">0</span></div>
+      <div class="hud-chip" id="hud-wave" hidden>Wave <span id="hud-wave-n">1</span></div>
+      <div class="hud-chip" id="hud-cash" hidden><span class="coin-dot"></span>+<span id="hud-cash-n">0</span></div>
     </div>
+    <div id="hp-bar" hidden><div id="hp-fill"></div></div>
     <div class="climb-rail" aria-hidden="true">
       <div class="climb-fill" id="climb-fill"></div>
       <div class="climb-flag">⚑</div>
     </div>
     <div id="toast-layer"></div>
     <button id="btn-ragdoll" aria-label="Go limp (R)"><canvas></canvas></button>
+    <button id="btn-attack" aria-label="Attack" hidden>✊</button>
     <div id="lab-controls" hidden>
       <button class="lab-btn" id="btn-lab-spawn">＋ Spawn</button>
       <button class="lab-btn lab-btn-clear" id="btn-lab-clear">✕ Clear</button>
@@ -77,6 +81,7 @@
         <div class="menu">
           <button class="btn btn-primary" id="btn-play">▶ <span id="btn-play-label">Play</span></button>
           <button class="btn btn-endless" id="btn-endless">♾ Endless <span id="btn-endless-best"></span></button>
+          <button class="btn btn-arena" id="btn-arena">✊ Fight Pit <span id="btn-arena-best"></span></button>
           <button class="btn btn-lab" id="btn-lab">🔨 Smash Lab</button>
           <div class="menu-row">
             <button class="btn" id="btn-levels">🗺 Levels</button>
@@ -117,6 +122,7 @@
           <button class="tab active" data-tab="upgrade">Gear</button>
           <button class="tab" data-tab="skin">Skins</button>
           <button class="tab" data-tab="hat">Hats</button>
+          <button class="tab" data-tab="build">Build</button>
         </div>
         <div class="shop-grid" id="shop-grid"></div>
       </div>
@@ -174,12 +180,30 @@
             <li><i class="sw bouncy"></i>Bouncer — flings you way up.</li>
             <li><i class="sw spike"></i>Spikes &amp; sawblades — they cut through whatever they touch.</li>
           </ul>
+          <p><b>Fight Pit.</b> Waves of stick figures come at you in a small arena. Punch with <kbd>F</kbd> or the fist button; jump first and it lands as a heavier kick. They wind up visibly before they swing, so every hit is dodgeable. Each one you drop pays out, each wave cleared pays a bonus, and it keeps going until you are knocked out.</p>
           <p><b>Smash Lab.</b> A room full of stick figures and no climbing. Drag one about with a finger or the mouse, fling it at the blocks, the spikes or the sawblades, and you get paid for the damage. Bodies restock themselves. Everything you earn goes straight into your Stick Credits.</p>
           <p><b>Endless.</b> One tower, no top, and a red floor that keeps rising. It gets harder the higher you go and stops getting harder at 520m. One life per run — your best climb is kept, and every metre pays Stick Credits.</p>
           <p><b>Go limp.</b> Press <kbd>R</kbd> or tap the stickman button at the bottom of the screen and he drops into a ragdoll wherever he is. Press it again to get back up. Flop into the red floor while limp and it counts as a death.</p>
-          <p><b>Mind the drop.</b> Land from too great a height and he trips over — no control for a moment while he picks himself up, which is plenty of time to slide off a ledge. Grip Gloves let you take a harder landing before it happens.</p>
           <p><b>When it goes wrong.</b> The stickman is a ragdoll, and he comes apart <em>where the blade went through</em> — land on spikes and you lose your legs, walk into a sawblade at head height and you lose your head. Whatever is left flops all the way down the tower, painting the blocks on the way. It will not tidy itself up — tap, click or press a key when you have seen enough. Squeamish? Turn <b>Blood &amp; guts</b> off in Settings.</p>
           <p><b>Stick Credits.</b> Collect coins, clear levels fast and death-free, then spend the lot in the Shop on gear, skins and hats. Replaying a cleared level pays 30%.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Fight over -->
+    <section class="screen" id="screen-arena">
+      <div class="sheet sheet-sm">
+        <div class="endless-crown" id="pit-crown">✊</div>
+        <h2 class="centre" id="pit-title">Knocked out</h2>
+        <div class="end-height"><b id="pit-wave">0</b><span>waves survived</span></div>
+        <div class="tally" id="pit-tally"></div>
+        <div class="payout"><span>Stick Credits</span><b id="pit-total">+0</b></div>
+        <div class="menu">
+          <button class="btn btn-primary" id="btn-pit-again">✊ Fight again</button>
+          <div class="menu-row">
+            <button class="btn" id="btn-pit-shop">🛒 Shop</button>
+            <button class="btn btn-ghost" id="btn-pit-menu">Menu</button>
+          </div>
         </div>
       </div>
     </section>
@@ -209,6 +233,7 @@
         <div class="menu">
           <button class="btn btn-primary" id="btn-resume">▶ Resume</button>
           <button class="btn" id="btn-restart">↻ Restart level</button>
+          <button class="btn btn-skip" id="btn-skip" hidden>⏭ Skip level · <span id="btn-skip-price">0</span></button>
           <button class="btn btn-ghost" id="btn-quit">✕ Back to menu</button>
         </div>
       </div>
@@ -242,6 +267,7 @@
 <script src="js/stick.js"></script>
 <script src="js/level.js"></script>
 <script src="js/lab.js"></script>
+<script src="js/arena.js"></script>
 <script src="js/gore.js"></script>
 <script src="js/render.js"></script>
 <script src="js/game.js"></script>

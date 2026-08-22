@@ -28,6 +28,23 @@
     { id: 'hat_prop',  name: 'Propeller Beanie', price: 1400, desc: 'Spins. Provides no lift whatsoever.' }
   ];
 
+  /* --------- builds: the shape of him. Purely how he is drawn — the hitbox
+       never changes, so nothing about the physics or the levels shifts. --------- */
+  const BUILDS = [
+    { id: 'build_classic', name: 'Classic',  price: 0,    desc: 'The standard-issue stickman.',
+      lw: 1,    head: 1,    spread: 1,    belly: 0,   legs: 1 },
+    { id: 'build_lanky',   name: 'Lanky',    price: 200,  desc: 'All elbows. Thin as a rake.',
+      lw: 0.78, head: 0.88, spread: 1.12, belly: 0,   legs: 1.06 },
+    { id: 'build_stocky',  name: 'Stocky',   price: 350,  desc: 'Short, wide and low to the ground.',
+      lw: 1.45, head: 1.08, spread: 0.9,  belly: 3.2, legs: 0.9 },
+    { id: 'build_chonk',   name: 'Absolute Unit', price: 700, desc: 'A gut you could rest a pint on.',
+      lw: 2.1,  head: 1.15, spread: 0.82, belly: 6.5, legs: 0.86 },
+    { id: 'build_buff',    name: 'Buff',     price: 900,  desc: 'Shoulders like a doorway.',
+      lw: 1.9,  head: 0.95, spread: 1.2,  belly: 1.6, legs: 1 },
+    { id: 'build_pip',     name: 'Pipsqueak', price: 550, desc: 'Big head, little everything else.',
+      lw: 0.95, head: 1.45, spread: 0.82, belly: 0,   legs: 0.88 }
+  ];
+
   /* --------- gear: tiered, permanent, changes how you play --------- */
   const GEAR = [
     { id: 'boots',  name: 'Spring Boots', glyph: '🥾', prices: [250, 600, 1200],
@@ -59,6 +76,7 @@
   const byId = {};
   SKINS.forEach(s => (byId[s.id] = Object.assign({ type: 'skin' }, s)));
   HATS.forEach(h => (byId[h.id] = Object.assign({ type: 'hat' }, h)));
+  BUILDS.forEach(b => (byId[b.id] = Object.assign({ type: 'build' }, b)));
   GEAR.forEach(g => (byId[g.id] = Object.assign({ type: 'upgrade' }, g)));
 
   /* Roll every owned upgrade into one set of numbers the game reads each frame. */
@@ -86,6 +104,9 @@
   }
   const maxTier = (item) => (item.type === 'upgrade' ? item.prices.length : 1);
 
-  SL.items = { SKINS, HATS, GEAR, byId, modifiers, price, maxTier,
-    list: (type) => (type === 'skin' ? SKINS : type === 'hat' ? HATS : GEAR).map(i => byId[i.id]) };
+  const buildOf = (id) => byId[id] || byId.build_classic;
+
+  SL.items = { SKINS, HATS, GEAR, BUILDS, byId, modifiers, price, maxTier, buildOf,
+    list: (type) => (type === 'skin' ? SKINS : type === 'hat' ? HATS
+      : type === 'build' ? BUILDS : GEAR).map(i => byId[i.id]) };
 })(window.SL);

@@ -6,6 +6,7 @@
   const $$ = (s) => Array.prototype.slice.call(document.querySelectorAll(s));
 
   const stack = [];
+  const clampPct = (v) => (Math.max(0, Math.min(1, v)) * 100).toFixed(1);
   let current = 'title';
   let shopTab = 'upgrade';
   let settingsTab = 'game';
@@ -66,6 +67,8 @@
     $('#btn-play-label').textContent = next > 1 ? ('Continue · Level ' + next) : 'Play';
     const best = SL.save.endlessBest();
     $('#btn-endless-best').textContent = best ? '· best ' + fmtNum(best) + 'm' : '';
+    const wb = SL.save.arenaBest();
+    $('#btn-arena-best').textContent = wb ? '· best wave ' + fmtNum(wb) : '';
   }
 
   /* ---------------- level select ---------------- */
@@ -98,7 +101,7 @@
   }
 
   /* ---------------- shop ---------------- */
-  function preview(skinId, hatId) {
+  function preview(skinId, hatId, buildId) {
     const c = document.createElement('canvas');
     const size = 56, dpr = Math.min(2, window.devicePixelRatio || 1);
     c.width = size * dpr; c.height = size * dpr;
@@ -107,7 +110,7 @@
     x.save();
     x.translate(size / 2, size - 6);
     x.scale(1.16, 1.16);
-    SL.stick.draw(x, { skin: skinId, hat: hatId, pose: 'idle', phase: 1.2, facing: 1, t: 0.6 });
+    SL.stick.draw(x, { skin: skinId, hat: hatId, build: buildId, pose: 'idle', phase: 1.2, facing: 1, t: 0.6 });
     x.restore();
     return c;
   }
@@ -123,8 +126,9 @@
       const card = el('div', 'card');
       const art = el('div', 'card-art');
 
-      if (it.type === 'skin') art.appendChild(preview(it.id, SL.save.equipped('hat')));
-      else if (it.type === 'hat') art.appendChild(preview(SL.save.equipped('skin'), it.id));
+      if (it.type === 'skin') art.appendChild(preview(it.id, SL.save.equipped('hat'), SL.save.equipped('build')));
+      else if (it.type === 'hat') art.appendChild(preview(SL.save.equipped('skin'), it.id, SL.save.equipped('build')));
+      else if (it.type === 'build') art.appendChild(preview(SL.save.equipped('skin'), SL.save.equipped('hat'), it.id));
       else art.textContent = it.glyph;
       card.appendChild(art);
 
@@ -163,7 +167,7 @@
         }
       } else {
         const owned = SL.save.owns(it.id) || it.price === 0;
-        const slot = it.type;
+        const slot = it.type;    // 'skin' | 'hat' | 'build'
         const equipped = SL.save.equipped(slot) === it.id;
         if (equipped) { btn.textContent = 'Worn'; btn.classList.add('on'); btn.disabled = true; card.classList.add('equipped'); }
         else if (owned) { btn.textContent = 'Wear'; btn.classList.add('equip'); btn.addEventListener('click', () => equip(slot, it.id)); }
@@ -201,7 +205,7 @@
     renderShop();
   }
   function flashWallet() {
-    const w = $('#wallet-shop');
+    const w = $('#wallet-shop') || $('#btn-skip');
     if (!w) return;
     w.animate(
       [{ transform: 'translateX(0)' }, { transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'translateX(0)' }],
@@ -258,7 +262,8 @@
   function bindHud() {
     SL.game.on('hud', (h) => {
       const lvl = $('#hud-level');
-      const txt = h.lab ? 'Smash Lab' : (h.endless ? 'Endless · ' + h.themeName : 'Lvl ' + h.n + ' · ' + h.themeName);
+      const txt = h.lab ? 'Smash Lab' : h.arena ? 'Fight Pit'
+        : (h.endless ? 'Endless · ' + h.themeName : 'Lvl ' + h.n + ' · ' + h.themeName);
       if (lvl.textContent !== txt) lvl.textContent = txt;
       $('#hud-coin-n').textContent = h.coins;
       $('#hud-coin-t').textContent = h.coinTotal;
@@ -267,13 +272,27 @@
       $('#hud-height').hidden = !h.endless;
       $('#hud-lab-n').textContent = fmtNum(h.labEarned);
       $('#hud-lab').hidden = !h.lab;
-      $('#hud-deaths').hidden = !!h.endless || !!h.lab;
-      $('#hud-coins').hidden = !!h.lab;
+      $('#hud-deaths').hidden = !!h.endless || !!h.lab || !!h.arena;
+      $('#hud-coins').hidden = !!h.lab || !!h.arena;
       /* nothing to drive in the lab — get the controls out of the way */
       $('#btn-ragdoll').hidden = !!h.lab;
       $('.climb-rail').hidden = !!h.lab;
       $('#lab-controls').hidden = !h.lab;
       if (h.lab) document.getElementById('touch').hidden = true;
+      /* fight pit: health bar, wave, purse, and a fist instead of go-limp */
+      $('#hud-wave-n').textContent = h.wave;
+      $('#hud-wave').hidden = !h.arena;
+      $('#hud-cash-n').textContent = fmtNum(h.arenaEarned);
+      $('#hud-cash').hidden = !h.arena;
+      $('#hp-bar').hidden = !h.arena;
+      if (h.arena) {
+        const frac = clampPct(h.hp / Math.max(1, h.hpMax));
+        $('#hp-fill').style.width = frac + '%';
+        $('#hp-fill').classList.toggle('low', h.hp / Math.max(1, h.hpMax) < 0.35);
+        $('#btn-ragdoll').hidden = true;
+        $('.climb-rail').hidden = true;
+      }
+      $('#btn-attack').hidden = !(h.arena && touchWanted());
       $('#hud-coin-sep').hidden = !!h.endless;
       $('#hud-coin-t').hidden = !!h.endless;
       $('#climb-fill').style.height = (h.progress * 100).toFixed(1) + '%';
@@ -289,6 +308,7 @@
     SL.game.on('retry', showRetry);
     SL.game.on('limp', paintRagdollBtn);
     SL.game.on('endless', showEndless);
+    SL.game.on('arena', showArena);
     paintRagdollBtn(false);
   }
 
@@ -311,6 +331,29 @@
       whereLine(info.where) +
       (touchWanted() ? ' Tap anywhere to try again.' : ' Click or press a key to try again.');
     box.hidden = false;
+  }
+
+  /* ---------------- knocked out ---------------- */
+  function showArena(res) {
+    $('#pit-title').textContent = res.isBest ? 'New best!' : 'Knocked out';
+    $('#pit-crown').textContent = res.isBest ? '★' : '✊';
+    $('#pit-wave').textContent = fmtNum(res.wave);
+    const tally = $('#pit-tally');
+    tally.innerHTML = '';
+    const row = (k, v, plus) => {
+      const d = el('div', plus ? 'plus' : null);
+      d.appendChild(el('span', null, k));
+      d.appendChild(el('b', null, v));
+      tally.appendChild(d);
+    };
+    row('Best wave', fmtNum(res.best));
+    row('Knocked out', fmtNum(res.kills));
+    $('#pit-total').textContent = '+' + fmtNum(res.earned);
+    $$('.screen').forEach(sc => sc.classList.toggle('active', sc.id === 'screen-arena'));
+    current = 'arena';
+    document.getElementById('touch').hidden = true;
+    document.getElementById('hud').hidden = true;
+    walletAll();
   }
 
   /* ---------------- endless run over ---------------- */
@@ -394,10 +437,19 @@
     SL.game.startLab();
   }
 
+  function playArena() {
+    hideScreens(true);
+    SL.game.startArena();
+  }
+
   function bind() {
     $('#btn-play').addEventListener('click', () => { SL.audio.play('ui'); playLevel(SL.save.data.unlocked); });
     $('#btn-endless').addEventListener('click', () => { SL.audio.play('ui'); playEndless(); });
     $('#btn-lab').addEventListener('click', () => { SL.audio.play('ui'); playLab(); });
+    $('#btn-arena').addEventListener('click', () => { SL.audio.play('ui'); playArena(); });
+    $('#btn-pit-again').addEventListener('click', () => { SL.audio.play('ui'); playArena(); });
+    $('#btn-pit-shop').addEventListener('click', () => { SL.audio.play('ui'); stack.length = 0; stack.push('title'); show('shop', false); });
+    $('#btn-pit-menu').addEventListener('click', () => { SL.audio.play('back'); SL.game.showcase(SL.save.data.unlocked); show('title', false); });
     $('#btn-lab-spawn').addEventListener('click', (e) => { e.stopPropagation(); SL.audio.unlock(); SL.lab.addOne(SL.game.S); });
     $('#btn-lab-clear').addEventListener('click', (e) => { e.stopPropagation(); SL.audio.unlock(); SL.lab.clearRoom(SL.game.S); });
     $('#btn-levels').addEventListener('click', () => { SL.audio.play('ui'); show('levels', true); });
@@ -421,6 +473,12 @@
     $('#btn-pause').addEventListener('click', () => pauseGame());
     $('#btn-resume').addEventListener('click', () => { SL.audio.play('ui'); hideScreens(true); SL.game.resume(); });
     $('#btn-restart').addEventListener('click', () => { SL.audio.play('ui'); hideScreens(true); SL.game.restart(); });
+    $('#btn-skip').addEventListener('click', () => {
+      const n = SL.game.S.level.n;
+      if (SL.save.credits() < SL.game.skipPrice(n)) { SL.audio.play('nope'); flashWallet(); return; }
+      hideScreens(true);
+      SL.game.skipLevel();
+    });
     $('#btn-quit').addEventListener('click', () => { SL.audio.play('back'); SL.game.showcase(SL.save.data.unlocked); show('title', false); });
 
     $('#btn-next').addEventListener('click', () => { SL.audio.play('ui'); hideScreens(true); SL.game.nextLevel(); });
@@ -458,6 +516,15 @@
     if (!SL.game.pause()) return;
     const inLab = SL.game.pausedFrom === 'lab';
     $('#btn-restart').textContent = inLab ? '↻ Reset room' : '↻ Restart level';
+    const skip = $('#btn-skip');
+    if (SL.game.canSkip()) {
+      const cost = SL.game.skipPrice(SL.game.S.level.n);
+      $('#btn-skip-price').textContent = fmtNum(cost);
+      skip.hidden = false;
+      skip.classList.toggle('poor', SL.save.credits() < cost);
+    } else {
+      skip.hidden = true;
+    }
     SL.audio.play('back');
     $$('.screen').forEach(s => s.classList.toggle('active', s.id === 'screen-pause'));
     current = 'pause';

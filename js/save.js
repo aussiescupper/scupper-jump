@@ -6,12 +6,13 @@
   const DEFAULTS = () => ({
     credits: 0,
     unlocked: 1,          // highest level the player may enter
-    owned: { skin_classic: 1, hat_none: 1 },
+    owned: { skin_classic: 1, hat_none: 1, build_classic: 1 },
     upgrades: {},          // id -> tier owned (1-based)
-    equip: { skin: 'skin_classic', hat: 'hat_none' },
+    equip: { skin: 'skin_classic', hat: 'hat_none', build: 'build_classic' },
     progress: {},          // levelNumber -> {t:bestTime, d:bestDeaths, c:bestCoins, s:stars}
     stats: { runs: 0, deaths: 0, jumps: 0, coins: 0, earned: 0, playtime: 0 },
     endless: { best: 0 },
+    arena: { best: 0 },
     settings: { sfx: true, music: false, haptic: true, lowfx: false, forceTouch: false, gore: true, blood: true },
     seen: { howto: false }
   });
@@ -33,6 +34,7 @@
         data.settings = Object.assign(base.settings, parsed.settings || {});
         data.seen = Object.assign(base.seen, parsed.seen || {});
         data.endless = Object.assign(base.endless, parsed.endless || {});
+        data.arena = Object.assign(base.arena, parsed.arena || {});
         data.upgrades = parsed.upgrades || {};
         data.progress = parsed.progress || {};
       }
@@ -96,6 +98,9 @@
     bump(k, n) { data.stats[k] = (data.stats[k] || 0) + (n == null ? 1 : n); save(); },
 
     endlessBest: () => (data.endless && data.endless.best) || 0,
-    setEndlessBest(h) { data.endless.best = h; save(); }
+    setEndlessBest(h) { data.endless.best = h; save(); },
+
+    arenaBest: () => (data.arena && data.arena.best) || 0,
+    setArenaBest(w) { data.arena.best = w; save(); }
   };
 })(window.SL);

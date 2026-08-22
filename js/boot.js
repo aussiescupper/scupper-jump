@@ -1,7 +1,7 @@
 /* Scupper Jump — wiring: canvas, input, PWA install, service worker */
 (function (SL) {
   'use strict';
-  SL.VERSION = '1.7.2';
+  SL.VERSION = '1.8.0';
 
   const canvas = document.getElementById('game');
 
@@ -43,7 +43,8 @@
   const KEYS = {
     ArrowLeft: 'left', KeyA: 'left',
     ArrowRight: 'right', KeyD: 'right',
-    ArrowUp: 'jump', KeyW: 'jump', Space: 'jump', KeyZ: 'jump', KeyJ: 'jump'
+    ArrowUp: 'jump', KeyW: 'jump', Space: 'jump', KeyZ: 'jump', KeyJ: 'jump',
+    KeyF: 'attack', KeyX: 'attack', ShiftLeft: 'attack'
   };
   function bindKeys() {
     window.addEventListener('keydown', (e) => {
@@ -85,6 +86,26 @@
   /* ---------------- touch pad ---------------- */
   function bindTouch() {
     const pad = document.getElementById('touch');
+    bindPad(pad);
+    const fist = document.getElementById('btn-attack');
+    if (!fist) return;                       // markup missing: do not take the whole boot down
+    const fistDown = (e) => {
+      e.preventDefault();
+      SL.ui.noteTouch();
+      fist.classList.add('on');
+      SL.game.setTouch('attack', true);
+    };
+    const fistUp = (e) => { if (e) e.preventDefault(); fist.classList.remove('on'); SL.game.setTouch('attack', false); };
+    fist.addEventListener('pointerdown', fistDown);
+    fist.addEventListener('pointerup', fistUp);
+    fist.addEventListener('pointercancel', fistUp);
+    fist.addEventListener('pointerleave', fistUp);
+    fist.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    bindWindowTouchOnce();
+  }
+
+  function bindPad(pad) {
     pad.querySelectorAll('.tbtn').forEach(btn => {
       const key = btn.dataset.key;
       const down = (e) => {
@@ -105,6 +126,9 @@
       btn.addEventListener('pointerleave', up);
       btn.addEventListener('contextmenu', (e) => e.preventDefault());
     });
+  }
+
+  function bindWindowTouchOnce() {
     window.addEventListener('touchstart', () => {
       SL.ui.noteTouch();
       if (SL.game.mode === 'play') document.getElementById('touch').hidden = false;

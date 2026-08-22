@@ -23,6 +23,7 @@
   const rnd = (a, b) => a + Math.random() * (b - a);
   const SKINS = ['#e9eefb', '#ff6b6b', '#57b6ff', '#b6ff5c', '#3ddc97', '#ffd166', '#c9a4ff', '#ff8a3d'];
   const HATS = [null, 'hat_cap', 'hat_beanie', 'hat_cork', 'hat_akubra', 'hat_crown', 'hat_prop'];
+  const BUILD_POOL = ['build_classic', 'build_lanky', 'build_stocky', 'build_chonk', 'build_buff', 'build_pip'];
 
   /* ---------------- the room ----------------
      A plain padded cell: floor, two walls and a ceiling. Nothing to climb,
@@ -52,7 +53,8 @@
       x: rnd(34, W - 34), vx: 0, facing: Math.random() < 0.5 ? -1 : 1,
       phase: rnd(0, 6.28), wanderT: rnd(0.6, 3),
       colour: SKINS[(Math.random() * SKINS.length) | 0],
-      hat: HATS[(Math.random() * HATS.length) | 0]
+      hat: HATS[(Math.random() * HATS.length) | 0],
+      build: BUILD_POOL[(Math.random() * BUILD_POOL.length) | 0]
     };
     lab.standing.push(fig);
     return fig;
@@ -64,7 +66,7 @@
     if (i >= 0) lab.standing.splice(i, 1);
     const rd = SL.gore.makeRagdoll(fig.x, 0.5, {
       vx: vx || 0, vy: vy || 0,
-      colour: fig.colour, hat: fig.hat, alive: false
+      colour: fig.colour, hat: fig.hat, build: fig.build, alive: false
     });
     rd.hp = 100;
     rd.restT = 0;
@@ -315,7 +317,7 @@
       ctx.save();
       ctx.translate(f.x, toY(0));
       SL.stick.draw(ctx, {
-        skin: null, hat: f.hat, colour: f.colour,
+        skin: null, hat: f.hat, colour: f.colour, build: f.build,
         pose: f.vx ? 'run' : 'idle', phase: f.phase, facing: f.facing, t
       });
       ctx.restore();

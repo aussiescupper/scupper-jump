@@ -499,6 +499,10 @@
 
     /* the remains — or a body that has gone limp on purpose */
     if (S.player.dead || S.limp) SL.gore.drawParts(S, ctx, toY, t);
+    if (S.run && S.run.arena && S.arena) {
+      SL.gore.drawParts(S, ctx, toY, t);        // blood from the brawl
+      SL.arena.draw(ctx, S, toY, t);
+    }
     if (S.mode === 'lab' && S.lab) {
       SL.gore.drawParts(S, ctx, toY, t);      // blood and giblets from the smashing
       SL.lab.draw(ctx, S, toY, t);
@@ -523,7 +527,8 @@
       ctx.translate(pl.x + pl.w / 2, toY(pl.y));
       SL.stick.draw(ctx, {
         skin: SL.save.equipped('skin'), hat: SL.save.equipped('hat'),
-        pose: pl.pose, phase: pl.animPhase, facing: pl.facing, t, squash: pl.squash, rot: pl.rot
+        pose: pl.pose, phase: pl.animPhase, facing: pl.facing, t, squash: pl.squash, rot: pl.rot,
+        alpha: (S.run && S.run.arena) ? SL.arena.playerAlpha(S) : 1
       });
       ctx.restore();
     }

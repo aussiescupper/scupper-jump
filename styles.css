@@ -224,6 +224,9 @@ h2.centre{text-align:center;margin:0;font-size:22px;font-weight:800}
 .btn-primary:hover{background:linear-gradient(180deg,#ffd07a,#ffbb4d)}
 .btn-ghost{background:transparent;color:var(--txt-dim)}
 .btn-ghost:hover{background:rgba(255,255,255,.06);color:var(--txt)}
+.btn-skip{background:rgba(255,209,102,.12);border-color:rgba(255,209,102,.4);color:var(--gold)}
+.btn-skip:hover{background:rgba(255,209,102,.2)}
+.btn-skip.poor{opacity:.5}
 .btn-danger{background:rgba(255,93,108,.12);border-color:rgba(255,93,108,.4);color:#ff8d97}
 .btn-install{background:rgba(67,166,255,.13);border-color:rgba(67,166,255,.42);color:#8ecbff}
 .btn[disabled]{opacity:.42;pointer-events:none}
@@ -320,6 +323,33 @@ kbd{background:rgba(255,255,255,.10);border:1px solid var(--line2);border-bottom
   border-color:rgba(255,93,108,.45);color:#ff9aa3}
 .btn-lab:hover{background:rgba(255,93,108,.24)}
 #hud-lab{color:var(--gold)}
+
+/* ============ fight pit ============ */
+.btn-arena{background:linear-gradient(180deg,rgba(255,93,108,.2),rgba(255,93,108,.1));
+  border-color:rgba(255,93,108,.5);color:#ff9aa3}
+.btn-arena:hover{background:rgba(255,93,108,.26)}
+#btn-arena-best{font-size:12.5px;font-weight:700;color:var(--txt-dim);margin-left:2px}
+#hud-wave{color:#ff9aa3}
+#hud-cash{color:var(--gold)}
+#hp-bar{
+  position:absolute;left:50%;transform:translateX(-50%);
+  top:calc(58px + var(--safe-t));width:min(220px,60%);height:11px;
+  border-radius:99px;background:rgba(10,14,25,.6);border:1px solid var(--line2);
+  overflow:hidden;pointer-events:none;
+}
+#hp-fill{height:100%;width:100%;border-radius:99px;
+  background:linear-gradient(90deg,#3ddc97,#b6ff5c);transition:width .12s linear}
+#hp-fill.low{background:linear-gradient(90deg,#ff5d6c,#ffb037)}
+#btn-attack{
+  position:absolute;pointer-events:auto;cursor:pointer;padding:0;
+  right:calc(18px + var(--safe-r) + var(--tap-jump) + 14px);
+  bottom:calc(22px + var(--safe-b));
+  width:var(--tap-jump);height:var(--tap-jump);border-radius:50%;
+  background:rgba(255,93,108,.16);border:2px solid rgba(255,93,108,.45);
+  color:#ff9aa3;font-size:calc(var(--tap-jump) * .34);line-height:1;
+  display:grid;place-items:center;transition:transform .06s,background .1s;
+}
+#btn-attack.on,#btn-attack:active{background:rgba(255,93,108,.45);transform:scale(.93)}
 
 /* ============ endless ============ */
 .btn-endless{background:linear-gradient(180deg,rgba(201,164,255,.18),rgba(201,164,255,.10));

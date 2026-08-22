@@ -104,6 +104,7 @@
       pts, bones,
       colour: o.colour || '#e9eefb',
       hat: o.hat || null,
+      build: o.build || null,
       headRot: 0, headSpin: 0,
       burst: false, asleep: false,
       alive: !!o.alive,
@@ -123,6 +124,7 @@
       vx: pl.vx * 0.6, vy: pl.vy * 0.35,
       colour: SL.stick.skinColour(SL.save.equipped('skin'), S.time),
       hat: SL.save.equipped('hat'),
+      build: SL.save.equipped('build'),
       alive: !!opts.alive
     });
     g.rd = rd;
@@ -727,8 +729,9 @@
     ctx.save();
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+    const bld = SL.items.buildOf(rd.build);
     ctx.strokeStyle = rd.colour;
-    ctx.lineWidth = BONE_W;
+    ctx.lineWidth = BONE_W * bld.lw;
 
     for (const b of rd.bones) {
       if (b.dead || b.stiff !== 1) continue;
@@ -752,8 +755,8 @@
     ctx.save();
     ctx.translate(h.x, toY(h.y));
     ctx.rotate(ang);
-    ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.arc(0, 0, HEAD_R, 0, 6.284); ctx.stroke();
+    ctx.lineWidth = 2.5 * bld.lw;
+    ctx.beginPath(); ctx.arc(0, 0, HEAD_R * bld.head, 0, 6.284); ctx.stroke();
     ctx.lineWidth = 1.2;
     for (const ex of [-1.8, 1.8]) {          // dead eyes
       ctx.beginPath();

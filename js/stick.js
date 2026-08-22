@@ -38,6 +38,29 @@
         lean: -f * 0.8
       };
     }
+    if (pose === 'punch') {
+      /* lead arm straight out, back arm cocked, feet planted */
+      return {
+        legs: [[f * 4, HIP + 5, f * 7.5, 0], [-f * 3.5, HIP + 5.5, -f * 6.5, 0]],
+        arms: [[f * 6, SHOULDER + 0.5, f * 11.5, SHOULDER + 0.5], [-f * 3.5, SHOULDER + 2, -f * 1.5, SHOULDER + 5]],
+        lean: f * 2.2
+      };
+    }
+    if (pose === 'windup') {
+      /* drawn back, about to swing — the tell */
+      return {
+        legs: [[f * 3, HIP + 5, f * 6, 0], [-f * 3.5, HIP + 5.5, -f * 6.5, 0]],
+        arms: [[-f * 4.5, SHOULDER - 2, -f * 7.5, SHOULDER - 4.5], [-f * 2.5, SHOULDER + 3, -f * 0.5, SHOULDER + 6]],
+        lean: -f * 1.8
+      };
+    }
+    if (pose === 'kick') {
+      return {
+        legs: [[f * 6, HIP + 2, f * 12, HIP + 1], [-f * 3, HIP + 6, -f * 4.5, HIP + 10]],
+        arms: [[f * 4, SHOULDER - 3, f * 5.5, SHOULDER - 7.5], [-f * 5.5, SHOULDER + 1, -f * 7.5, SHOULDER + 4]],
+        lean: f * 1.4
+      };
+    }
     if (pose === 'trip') {
       /* sprawled forward, hands out to break the fall */
       return {
@@ -146,6 +169,7 @@
   function draw(ctx, o) {
     const facing = o.facing || 1;
     const t = o.t || 0;
+    const b = SL.items.buildOf(o.build || (SL.save && SL.save.equipped && SL.save.equipped('build')));
     const colour = o.colour || skinColour(o.skin, t);
     const skin = SL.items.byId[o.skin];
     const fx = skin ? skin.fx : null;
@@ -162,35 +186,47 @@
     ctx.lineJoin = 'round';
     ctx.strokeStyle = colour;
     ctx.fillStyle = colour;
-    ctx.lineWidth = o.thin ? 2.3 : 3.0;
+    ctx.lineWidth = (o.thin ? 2.3 : 3.0) * b.lw;
     ctx.globalAlpha = (o.alpha == null ? 1 : o.alpha) * (fx === 'ghost' ? 0.62 : 1);
 
     if (fx === 'glow' || fx === 'rainbow') { ctx.shadowColor = colour; ctx.shadowBlur = 10; }
     if (fx === 'sparkle') { ctx.shadowColor = 'rgba(255,209,102,.85)'; ctx.shadowBlur = 6; }
 
+    /* build reshapes how far the limbs reach out; it never moves the feet or
+       the head height, so the 18x30 hitbox stays honest */
+    const sx = b.spread, sl = b.legs;
+    const L0 = p.legs[0], L1 = p.legs[1], A0 = p.arms[0], A1 = p.arms[1];
     /* legs */
-    limb(ctx, 0, HIP, p.legs[0][0], p.legs[0][1], p.legs[0][2], p.legs[0][3]);
-    limb(ctx, 0, HIP, p.legs[1][0], p.legs[1][1], p.legs[1][2], p.legs[1][3]);
-    /* torso */
+    limb(ctx, 0, HIP, L0[0] * sl, L0[1], L0[2] * sl, L0[3]);
+    limb(ctx, 0, HIP, L1[0] * sl, L1[1], L1[2] * sl, L1[3]);
+    /* torso, with a gut on the heavier builds */
     ctx.beginPath(); ctx.moveTo(0, HIP); ctx.lineTo(p.lean, SHOULDER); ctx.stroke();
+    if (b.belly > 0) {
+      const cy = (HIP + SHOULDER) / 2;
+      ctx.beginPath();
+      ctx.ellipse(p.lean * 0.5 + facing * b.belly * 0.22, cy, b.belly, (HIP - SHOULDER) / 2 + 0.5, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
     /* arms */
-    limb(ctx, p.lean, SHOULDER, p.arms[0][0], p.arms[0][1], p.arms[0][2], p.arms[0][3]);
-    limb(ctx, p.lean, SHOULDER, p.arms[1][0], p.arms[1][1], p.arms[1][2], p.arms[1][3]);
+    limb(ctx, p.lean, SHOULDER, A0[0] * sx, A0[1], A0[2] * sx, A0[3]);
+    limb(ctx, p.lean, SHOULDER, A1[0] * sx, A1[1], A1[2] * sx, A1[3]);
     /* head */
     ctx.beginPath();
-    ctx.arc(p.lean * 1.4, HEAD_Y, HEAD_R, 0, Math.PI * 2);
+    ctx.arc(p.lean * 1.4, HEAD_Y, HEAD_R * b.head, 0, Math.PI * 2);
     ctx.stroke();
     if (fx === 'ghost') { ctx.globalAlpha *= 0.35; ctx.fill(); ctx.globalAlpha /= 0.35; }
 
     /* eyes — a tiny bit of life */
     ctx.shadowBlur = 0;
     ctx.fillStyle = colour;
-    const ex = p.lean * 1.4 + facing * 1.4, ey = HEAD_Y - 0.5;
-    ctx.beginPath(); ctx.arc(ex, ey, 0.65, 0, 7); ctx.fill();
-    ctx.beginPath(); ctx.arc(ex - facing * 2.5, ey, 0.65, 0, 7); ctx.fill();
+    const ex = p.lean * 1.4 + facing * 1.4 * b.head, ey = HEAD_Y - 0.5;
+    ctx.beginPath(); ctx.arc(ex, ey, 0.65 * b.head, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(ex - facing * 2.5 * b.head, ey, 0.65 * b.head, 0, 7); ctx.fill();
 
     ctx.save();
     ctx.translate(p.lean * 1.4, 0);
+    ctx.scale(b.head, b.head);
+    ctx.translate(0, HEAD_Y * (1 / b.head - 1));      // keep the hat on the head
     drawHat(ctx, o.hat, colour, t, facing);
     ctx.restore();
 
