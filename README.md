@@ -65,6 +65,11 @@ tumbles the whole way down the tower, spraying blood and leaving **permanent sta
 surface it touches. The mess stays for the rest of your attempt; it is only cleared when you leave
 the level.
 
+Fall off somewhere high and the body is not chased forever: the camera follows it down 700px —
+more than a full screen, so you always see the whole tumble — then stops, lets it drop out of shot
+and deletes it. Without that, dying near the top of a tall endless run drags the camera a couple of
+thousand pixels and takes fifteen seconds about it. Short falls are unchanged and still land.
+
 A **corpse** slides off ledges and eventually slips through them, because it belongs at the
 bottom. A body you put down **on purpose** does not — it grips, settles on whatever block it lands
 on, and stays there.

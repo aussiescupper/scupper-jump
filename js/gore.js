@@ -605,6 +605,24 @@
     stepLoose(S, dt);
   }
 
+  /** Bin the body but keep the mess it made. Used when it has fallen out of sight. */
+  function vanish(S) {
+    ensure(S);
+    S.gore.rd = null;
+    S.gore.parts.length = 0;
+    S.gore.ropes.length = 0;
+    S.gore.drops.length = 0;
+  }
+
+  /** Highest point still attached to the body, for working out if it is off screen. */
+  function topOf(S) {
+    const rd = S.gore && S.gore.rd;
+    if (!rd) return -Infinity;
+    let top = -Infinity;
+    for (const p of rd.pts) if (p.y > top) top = p.y;
+    return top;
+  }
+
   /* where the camera should be looking: the centre of what is left of him */
   function focus(S) {
     ensure(S);
@@ -807,7 +825,7 @@
     ctx.restore();
   }
 
-  SL.gore = { reset, softReset, spawn, spawnLimp, kill, step, focus, drawDecals, drawParts, splash,
+  SL.gore = { reset, softReset, spawn, spawnLimp, kill, vanish, topOf, step, focus, drawDecals, drawParts, splash,
     /* reusable pieces, for the smash lab */
     makeRagdoll, stepBody, drawRagdoll, cut, stain, splashAt: splash, HEAD, CHEST, HIP };
 })(window.SL);

@@ -20,6 +20,7 @@
   const TRIP_TIME = 0.8;
   const CRUMBLE_TIME = 0.42;
   const CRUMBLE_REGEN = 3.0;       // a collapsed block rebuilds, so a missed jump can never strand you
+  const CHASE_LIMIT = 700;         // how far the camera will follow a body down before giving up
   const BOUNCE_MUL = 1.62;
 
   const input = { left: false, right: false, jump: false, jumpEdge: false, jumpHeld: false };
@@ -178,9 +179,16 @@
         S.awaitRetry = true;
         fire('retry', { cause: S.deathCause, where: S.cutWhere });
       }
-      /* follow the carnage wherever it ends up */
-      const want = clamp(SL.gore.focus(S) - R.view.h * 0.42, MIN_CAM, 1e9);
-      S.camY = damp(S.camY, want, 3.2, dt);
+      /* Follow the carnage down, but only so far. Off the top of a tall tower
+         the body would otherwise drag the camera thousands of pixels and take
+         fifteen seconds about it — so past CHASE_LIMIT the camera stops, the
+         body falls out of shot, and once it is gone it is deleted. */
+      if (S.gore.rd) {
+        const stopAt = (S.deathY || 0) - CHASE_LIMIT;
+        const want = clamp(SL.gore.focus(S) - R.view.h * 0.42, Math.max(MIN_CAM, stopAt), 1e9);
+        S.camY = damp(S.camY, want, 3.2, dt);
+        if (SL.gore.topOf(S) < S.camY - 90) SL.gore.vanish(S);
+      }
       return;
     }
 
@@ -462,6 +470,7 @@
     if (pl.dead) return;
     pl.dead = true; pl.deadT = 0;
     S.deathCause = cause;
+    S.deathY = pl.y;
     /* Clamp into the range where joints actually live (feet 0.5 .. head 25.8),
        otherwise a blade above the head point would sever nothing at all. */
     S.cutY = cutY == null ? null : clamp(cutY, pl.y + 1.2, pl.y + 25.2);
