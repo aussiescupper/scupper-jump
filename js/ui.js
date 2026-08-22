@@ -269,7 +269,8 @@
     if (!n) return;
     const a = SL.audio.state();
     n.textContent = !a.supported ? 'not supported by this browser'
-      : a.ctx === 'running' ? 'running at ' + Math.round(a.sampleRate / 1000) + 'kHz'
+      : a.ctx === 'running' ? 'on · ' + Math.round(a.sampleRate / 1000) + 'kHz'
+      : a.ctx === 'suspended' && a.started ? 'idle — speaker released'
       : a.started ? 'starting (' + a.ctx + ') — tap Test'
       : 'not started yet — tap Test';
   }
@@ -553,7 +554,9 @@
       $('#set-sfx').checked = true;
       SL.audio.applySettings();
       SL.audio.play('win');
-      setTimeout(refreshAudioState, 250);
+      refreshAudioState();
+      setTimeout(refreshAudioState, 400);
+      setTimeout(refreshAudioState, 3200);      // shows the route being released again
     });
 
     $('#btn-reset').addEventListener('click', () => {

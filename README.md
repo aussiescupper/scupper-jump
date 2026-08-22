@@ -224,6 +224,9 @@ from any sub-path.
   `OfflineAudioContext` and measured. `SL.audio.measure(name)` returns the peak and RMS of any
   effect — that is how the levels were set rather than by ear. Settings → Sound has a **Test**
   button that reports the live context state, for when a device is silencing the page.
+* The context is **suspended whenever nothing is playing** — after ~2s of silence, or the moment all
+  sound is switched off. An open-but-idle audio route is what many devices turn into a faint speaker
+  hiss, and setting the bus gain to zero does not release it. It wakes on the next effect.
 * On iOS the hardware mute switch silences web audio outright, whatever the in-game settings say.
 * Progress lives in `localStorage` under `scupperlab.jump.v1`.
 

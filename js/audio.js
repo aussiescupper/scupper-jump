@@ -6,6 +6,8 @@
 
   let ctx = null, master = null, sfxBus = null, musicBus = null;
   let started = false, musicTimer = 0, musicStep = 0, prime = null;
+  let lastSound = 0, idleTimer = 0;
+  const IDLE_MS = 2200;             // silence for this long and the route is released
 
   /* ---------------- voice specs ----------------
      gain is the voice's peak into its bus. These are deliberately loud: the
@@ -122,16 +124,25 @@
      and drops the session again when the page is backgrounded. */
   const SILENT = 'data:audio/wav;base64,UklGRvQHAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YdAHAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==';
   function primeElement() {
-    if (prime) { prime.play().catch(() => {}); return; }
+    /* iOS needs an element to have played inside a gesture before WebAudio will
+       start. It must NOT loop — a permanently playing element holds the output
+       route open, and an open route is what makes the speaker hiss. */
     try {
-      prime = document.createElement('audio');
-      prime.src = SILENT;
-      prime.loop = true;
-      prime.volume = 0.001;
-      prime.setAttribute('playsinline', '');
-      prime.playsInline = true;
-      prime.play().catch(() => {});
+      if (!prime) {
+        prime = document.createElement('audio');
+        prime.src = SILENT;
+        prime.loop = false;
+        prime.volume = 0.001;
+        prime.setAttribute('playsinline', '');
+        prime.playsInline = true;
+      }
+      const p = prime.play();
+      if (p && p.then) p.then(() => setTimeout(hushPrime, 500)).catch(() => {});
+      else setTimeout(hushPrime, 500);
     } catch (e) { /* ignore */ }
+  }
+  function hushPrime() {
+    try { if (prime && !prime.paused) { prime.pause(); prime.currentTime = 0; } } catch (e) { /* ignore */ }
   }
 
   function unlock() {
@@ -143,20 +154,54 @@
     applySettings();
   }
 
+  const wantsSound = () => {
+    const s = SL.save.data.settings;
+    return !!(s.sfx || s.music);
+  };
+
   function applySettings() {
     if (!ctx) return;
     const s = SL.save.data.settings;
     sfxBus.gain.setTargetAtTime(s.sfx ? 1 : 0, ctx.currentTime, 0.02);
     musicBus.gain.setTargetAtTime(s.music ? 0.3 : 0, ctx.currentTime, 0.05);
     if (s.music) startMusic(); else stopMusic();
+    if (!wantsSound()) suspend();          // all off means all off, not gain 0
+    else { lastSound = now(); wake(); }
+    watchIdle();
+  }
+
+  const now = () => (window.performance ? performance.now() : Date.now());
+
+  function wake() {
+    if (!ctx) return;
+    hushPrime();
+    if (ctx.state !== 'running') { try { ctx.resume(); } catch (e) { /* ignore */ } }
+  }
+  function suspend() {
+    if (!ctx || ctx.state !== 'running') return;
+    try { ctx.suspend(); } catch (e) { /* ignore */ }
+    hushPrime();
+  }
+
+  /* An open-but-idle audio route is what a lot of devices turn into a faint
+     hiss or hum from the speaker. Let it go when nothing is playing. */
+  function watchIdle() {
+    if (idleTimer) return;
+    idleTimer = setInterval(() => {
+      if (!ctx || !started) return;
+      if (!wantsSound()) { suspend(); return; }
+      if (SL.save.data.settings.music) return;      // music needs it open
+      if (now() - lastSound > IDLE_MS) suspend();
+    }, 600);
   }
 
   function play(name) {
     if (!started || !SL.save.data.settings.sfx) return;
     const spec = KIT[name];
     if (!spec || !ctx) return;
-    /* a suspended context silently swallows everything — try again, cheaply */
-    if (ctx.state !== 'running') { try { ctx.resume(); } catch (e) { /* ignore */ } }
+    lastSound = now();
+    /* a suspended context silently swallows everything — wake it first */
+    if (ctx.state !== 'running') wake();
     try {
       const at = ctx.currentTime;
       for (const v of spec) voice(ctx, sfxBus, v, at);
@@ -195,7 +240,8 @@
       ctx: ctx ? ctx.state : 'none',
       sampleRate: ctx ? ctx.sampleRate : 0,
       sfx: !!SL.save.data.settings.sfx,
-      music: !!SL.save.data.settings.music
+      music: !!SL.save.data.settings.music,
+      idleFor: started ? Math.round((now() - lastSound) / 100) / 10 : 0
     };
   }
 
