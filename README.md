@@ -40,6 +40,10 @@ The stickman is a **Verlet ragdoll** — eleven points (head, chest, hip, elbows
 feet) held together by bones. When he dies he stops being driven and just flops: limbs trail,
 the body folds over ledges, the head lolls on its neck.
 
+A heart, two lungs, a liver and four gibs are soft bodies — they squash along the axis they were
+hit on and spring back with an overshoot, so they jiggle rather than skitter like pebbles. The
+intestines are a proper Verlet rope that slithers, drapes over blocks and hangs off ledges.
+
 He comes apart **wherever the blade went through**. Every bone crossing the cut plane is severed
 and simply stops holding, so the pieces separate on their own:
 
@@ -61,6 +65,10 @@ tumbles the whole way down the tower, spraying blood and leaving **permanent sta
 surface it touches. The mess stays for the rest of your attempt; it is only cleared when you leave
 the level.
 
+A **corpse** slides off ledges and eventually slips through them, because it belongs at the
+bottom. A body you put down **on purpose** does not — it grips, settles on whatever block it lands
+on, and stays there.
+
 **Nothing stops it on its own.** The ragdoll runs until you tap, click or press a key.
 
 Settings has a **Gore** tab with two independent switches:
@@ -71,6 +79,13 @@ Settings has a **Gore** tab with two independent switches:
 | off | on | comes apart, entirely bloodless |
 | on | off | stays whole, bleeds where he lands |
 | off | off | a clean ragdoll |
+
+### Endless
+
+One tower with no top, a red floor that keeps rising, and one life per run. Difficulty is a
+function of how high you are rather than which level you picked, and it stops getting harder at
+520m. The tower is built a chunk at a time as you climb and pruned behind you, so a long run does
+not grow without bound. Every metre pays Stick Credits; your best climb is kept.
 
 ### Blocks and hazards
 
@@ -169,7 +184,7 @@ js/save.js          localStorage-backed progress
 js/audio.js         WebAudio synth — every sound is generated, no audio files
 js/items.js         shop catalogue + the modifiers it feeds to the physics
 js/stick.js         the stickman renderer (game canvas AND shop previews)
-js/level.js         procedural towers + the reachability proof
+js/level.js         procedural towers, the endless tower, the reachability proof
 js/gore.js          the Verlet ragdoll, the cut plane, organs, blood, stains
 js/render.js        backdrop, blocks, coins, hazards, particles, camera
 js/game.js          simulation, input, camera, scoring, main loop

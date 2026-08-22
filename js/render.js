@@ -89,13 +89,15 @@
     const decor = [];
     const kind = th.dust;
 
-    /* slow star / speck field, always present */
+    /* slow star / speck field, always present. `span` lets an endless tower
+       tile the field forever instead of climbing out the top of it. */
     const nStars = kind === 'star' ? 150 : 80;
     for (let i = 0; i < nStars; i++) {
       const px = rng.range(0.06, 0.3);
+      const span = top * px + view.h + 200;
       decor.push({
-        k: 'star', x: rng.range(0, VW), y: rng.range(-80, top * px + view.h + 200),
-        r: rng.range(0.6, 1.9), px, ph: rng.range(0, 6.28),
+        k: 'star', x: rng.range(0, VW), y: rng.range(-80, span),
+        r: rng.range(0.6, 1.9), px, ph: rng.range(0, 6.28), span,
         a: rng.range(0.25, 0.9)
       });
     }
@@ -103,9 +105,10 @@
     const nBlobs = 26;
     for (let i = 0; i < nBlobs; i++) {
       const px = rng.range(0.18, 0.42);
+      const span = top * px + view.h + 200;
       decor.push({
-        k: 'blob', x: rng.range(-60, VW + 60), y: rng.range(-100, top * px + view.h + 200),
-        w: rng.range(60, 180), h: rng.range(20, 58), px, ph: rng.range(0, 6.28), a: rng.range(0.06, 0.16)
+        k: 'blob', x: rng.range(-60, VW + 60), y: rng.range(-100, span),
+        w: rng.range(60, 180), h: rng.range(20, 58), px, ph: rng.range(0, 6.28), span, a: rng.range(0.06, 0.16)
       });
     }
     /* animated motes (snow, bubbles, dust, moths...) */
@@ -122,7 +125,7 @@
     for (let i = 0; i < 22; i++) {
       horizon.push({ x: rng.range(-30, VW + 30), w: rng.range(30, 95), h: rng.range(26, 110), r: rng.range(0, 1) });
     }
-    return { decor, motes, horizon, kind, th };
+    return { decor, motes, horizon, kind, th, wrap: !!level.endless };
   }
 
   function drawBackdrop(bd, camY, t, progress) {
@@ -138,7 +141,9 @@
 
     /* stars & blobs */
     for (const d of bd.decor) {
-      const sy = view.h - (d.y - camY * d.px);
+      let rel = d.y - camY * d.px;
+      if (bd.wrap) rel = ((rel % d.span) + d.span) % d.span;   // endless: tile it
+      const sy = view.h - rel;
       if (sy < -140 || sy > view.h + 140) continue;
       if (d.k === 'star') {
         const tw = 0.55 + 0.45 * Math.sin(t * 1.6 + d.ph);
@@ -371,7 +376,10 @@
     ctx.setTransform(view.dpr * view.scale, 0, 0, view.dpr * view.scale, view.ox * view.dpr, view.oy * view.dpr);
     ctx.beginPath(); ctx.rect(0, 0, view.w, view.h); ctx.clip();
 
-    const progress = clamp(S.player.y / Math.max(1, lv.goalY), 0, 1);
+    /* endless has no goal, so the sky cycles slowly with height instead */
+    const progress = lv.endless
+      ? ((S.player.y % 3000) + 3000) % 3000 / 3000
+      : clamp(S.player.y / Math.max(1, lv.goalY), 0, 1);
     drawBackdrop(S.backdrop, camY, t, progress);
 
     /* platforms */

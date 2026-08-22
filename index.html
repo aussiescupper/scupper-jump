@@ -25,8 +25,9 @@
     <div class="hud-top">
       <button class="icon-btn" id="btn-pause" aria-label="Pause">❚❚</button>
       <div class="hud-chip" id="hud-level">Level 1</div>
-      <div class="hud-chip" id="hud-coins"><span class="coin-dot"></span><span id="hud-coin-n">0</span>/<span id="hud-coin-t">0</span></div>
+      <div class="hud-chip" id="hud-coins"><span class="coin-dot"></span><span id="hud-coin-n">0</span><span id="hud-coin-sep">/</span><span id="hud-coin-t">0</span></div>
       <div class="hud-chip" id="hud-deaths">☠ <span id="hud-death-n">0</span></div>
+      <div class="hud-chip" id="hud-height" hidden><span id="hud-height-n">0</span> m</div>
     </div>
     <div class="climb-rail" aria-hidden="true">
       <div class="climb-fill" id="climb-fill"></div>
@@ -70,6 +71,7 @@
         <div class="wallet" id="wallet-title"></div>
         <div class="menu">
           <button class="btn btn-primary" id="btn-play">▶ <span id="btn-play-label">Play</span></button>
+          <button class="btn btn-endless" id="btn-endless">♾ Endless <span id="btn-endless-best"></span></button>
           <div class="menu-row">
             <button class="btn" id="btn-levels">🗺 Levels</button>
             <button class="btn" id="btn-shop">🛒 Shop</button>
@@ -166,10 +168,29 @@
             <li><i class="sw bouncy"></i>Bouncer — flings you way up.</li>
             <li><i class="sw spike"></i>Spikes &amp; sawblades — they cut through whatever they touch.</li>
           </ul>
+          <p><b>Endless.</b> One tower, no top, and a red floor that keeps rising. It gets harder the higher you go and stops getting harder at 520m. One life per run — your best climb is kept, and every metre pays Stick Credits.</p>
           <p><b>Go limp.</b> Press <kbd>R</kbd> or tap the stickman button at the bottom of the screen and he drops into a ragdoll wherever he is. Press it again to get back up. Flop into the red floor while limp and it counts as a death.</p>
           <p><b>Mind the drop.</b> Land from too great a height and he trips over — no control for a moment while he picks himself up, which is plenty of time to slide off a ledge. Grip Gloves let you take a harder landing before it happens.</p>
           <p><b>When it goes wrong.</b> The stickman is a ragdoll, and he comes apart <em>where the blade went through</em> — land on spikes and you lose your legs, walk into a sawblade at head height and you lose your head. Whatever is left flops all the way down the tower, painting the blocks on the way. It will not tidy itself up — tap, click or press a key when you have seen enough. Squeamish? Turn <b>Blood &amp; guts</b> off in Settings.</p>
           <p><b>Stick Credits.</b> Collect coins, clear levels fast and death-free, then spend the lot in the Shop on gear, skins and hats. Replaying a cleared level pays 30%.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Endless run over -->
+    <section class="screen" id="screen-endless">
+      <div class="sheet sheet-sm">
+        <div class="endless-crown" id="end-crown">♾</div>
+        <h2 class="centre" id="end-title">Run over</h2>
+        <div class="end-height"><b id="end-h">0</b><span>metres climbed</span></div>
+        <div class="tally" id="end-tally"></div>
+        <div class="payout"><span>Stick Credits</span><b id="end-total">+0</b></div>
+        <div class="menu">
+          <button class="btn btn-primary" id="btn-end-again">♾ Climb again</button>
+          <div class="menu-row">
+            <button class="btn" id="btn-end-shop">🛒 Shop</button>
+            <button class="btn btn-ghost" id="btn-end-menu">Menu</button>
+          </div>
         </div>
       </div>
     </section>

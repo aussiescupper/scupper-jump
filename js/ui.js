@@ -63,6 +63,8 @@
   function refreshTitle() {
     const next = SL.save.data.unlocked;
     $('#btn-play-label').textContent = next > 1 ? ('Continue · Level ' + next) : 'Play';
+    const best = SL.save.endlessBest();
+    $('#btn-endless-best').textContent = best ? '· best ' + fmtNum(best) + 'm' : '';
   }
 
   /* ---------------- level select ---------------- */
@@ -255,12 +257,18 @@
   function bindHud() {
     SL.game.on('hud', (h) => {
       const lvl = $('#hud-level');
-      const txt = 'Lvl ' + h.n + ' · ' + h.themeName;
+      const txt = h.endless ? 'Endless · ' + h.themeName : 'Lvl ' + h.n + ' · ' + h.themeName;
       if (lvl.textContent !== txt) lvl.textContent = txt;
       $('#hud-coin-n').textContent = h.coins;
       $('#hud-coin-t').textContent = h.coinTotal;
       $('#hud-death-n').textContent = h.deaths;
+      $('#hud-height-n').textContent = fmtNum(h.height);
+      $('#hud-height').hidden = !h.endless;
+      $('#hud-deaths').hidden = !!h.endless;
+      $('#hud-coin-sep').hidden = !!h.endless;
+      $('#hud-coin-t').hidden = !!h.endless;
       $('#climb-fill').style.height = (h.progress * 100).toFixed(1) + '%';
+      $('#climb-fill').classList.toggle('danger', !!h.endless);
     });
     SL.game.on('toast', (msg) => {
       const layer = $('#toast-layer');
@@ -271,6 +279,7 @@
     SL.game.on('complete', showComplete);
     SL.game.on('retry', showRetry);
     SL.game.on('limp', paintRagdollBtn);
+    SL.game.on('endless', showEndless);
     paintRagdollBtn(false);
   }
 
@@ -293,6 +302,32 @@
       whereLine(info.where) +
       (touchWanted() ? ' Tap anywhere to try again.' : ' Click or press a key to try again.');
     box.hidden = false;
+  }
+
+  /* ---------------- endless run over ---------------- */
+  function showEndless(res) {
+    $('#end-title').textContent = res.isBest ? 'New best climb!' : 'Run over';
+    $('#end-crown').textContent = res.isBest ? '★' : '♾';
+    $('#end-h').textContent = fmtNum(res.height);
+    const tally = $('#end-tally');
+    tally.innerHTML = '';
+    const row = (k, v, plus) => {
+      const d = el('div', plus ? 'plus' : null);
+      d.appendChild(el('span', null, k));
+      d.appendChild(el('b', null, v));
+      tally.appendChild(d);
+    };
+    row('Best climb', fmtNum(res.best) + ' m');
+    row('Time', fmtTime(res.elapsed));
+    if (res.climbCredits > 0) row('Height', '+' + fmtNum(res.climbCredits), true);
+    if (res.coinValue > 0) row('Coins ' + res.coins, '+' + fmtNum(res.coinValue), true);
+    if (res.mult > 1) row('Lucky Charm', '×' + res.mult.toFixed(2));
+    $('#end-total').textContent = '+' + fmtNum(res.total);
+    $$('.screen').forEach(sc => sc.classList.toggle('active', sc.id === 'screen-endless'));
+    current = 'endless';
+    document.getElementById('touch').hidden = true;
+    document.getElementById('hud').hidden = true;
+    walletAll();
   }
 
   /* ---------------- complete ---------------- */
@@ -340,8 +375,14 @@
     SL.game.start(n);
   }
 
+  function playEndless() {
+    hideScreens(true);
+    SL.game.startEndless();
+  }
+
   function bind() {
     $('#btn-play').addEventListener('click', () => { SL.audio.play('ui'); playLevel(SL.save.data.unlocked); });
+    $('#btn-endless').addEventListener('click', () => { SL.audio.play('ui'); playEndless(); });
     $('#btn-levels').addEventListener('click', () => { SL.audio.play('ui'); show('levels', true); });
     $('#btn-shop').addEventListener('click', () => { SL.audio.play('ui'); show('shop', true); });
     $('#btn-settings').addEventListener('click', () => { SL.audio.play('ui'); show('settings', true); });
@@ -369,6 +410,10 @@
     $('#btn-replay').addEventListener('click', () => { SL.audio.play('ui'); hideScreens(true); SL.game.restart(); });
     $('#btn-cmp-shop').addEventListener('click', () => { SL.audio.play('ui'); stack.length = 0; stack.push('title'); show('shop', false); });
     $('#btn-cmp-menu').addEventListener('click', () => { SL.audio.play('back'); SL.game.showcase(SL.save.data.unlocked); show('title', false); });
+
+    $('#btn-end-again').addEventListener('click', () => { SL.audio.play('ui'); playEndless(); });
+    $('#btn-end-shop').addEventListener('click', () => { SL.audio.play('ui'); stack.length = 0; stack.push('title'); show('shop', false); });
+    $('#btn-end-menu').addEventListener('click', () => { SL.audio.play('back'); SL.game.showcase(SL.save.data.unlocked); show('title', false); });
 
     const map = { 'set-sfx': 'sfx', 'set-music': 'music', 'set-haptic': 'haptic', 'set-gore': 'gore', 'set-blood': 'blood', 'set-lowfx': 'lowfx', 'set-touch': 'forceTouch' };
     Object.keys(map).forEach(id => {

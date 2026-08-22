@@ -50,23 +50,91 @@
 
   function themeFor(n) { return THEMES[Math.floor((n - 1) / 4) % THEMES.length]; }
 
+  /* The tunables for one stretch of tower. Levels pass a fixed difficulty;
+     the endless tower recomputes these as it climbs. */
+  function paramsFor(d, n) {
+    return {
+      d,
+      gapMin: 58 + 27 * d,
+      gapMax: 84 + 31 * d,
+      wMin: 68 - 26 * d,               // kept generous relative to the 18px-wide stickman
+      wMax: 100 - 52 * d,
+      spread: 0.42 + 0.44 * d,         // how much of the reach a gap may use
+      pMove: n >= 4 ? Math.min(0.42, (n - 3) * 0.045) : 0,
+      pCrumb: n >= 6 ? Math.min(0.34, (n - 5) * 0.045) : 0,
+      pIce: n >= 10 ? Math.min(0.28, (n - 9) * 0.040) : 0,
+      pBounce: n >= 5 ? 0.07 : 0,
+      pSpike: n >= 8 ? Math.min(0.34, (n - 7) * 0.045) : 0
+    };
+  }
+
+  /* Place one platform above `prev`. Shared by levels and the endless tower so
+     they cannot drift apart; the RNG call order here is what makes level 7 the
+     same tower for everyone, so do not reorder it. */
+  function placeNext(rng, prev, st, P, early, idFn) {
+    let w = early ? clamp(rng.range(88, 115), 70, 130)
+                  : Math.round(rng.range(P.wMin, P.wMax));
+
+    let dy = early ? rng.range(58, 76) : rng.range(P.gapMin, P.gapMax);
+    dy = clamp(dy, 40, MAX_RISE - 16);
+    const y = prev.y + dy;
+
+    let allowed = reach(dy) * 0.78;
+    if (allowed < 0) { dy = 70; allowed = reach(70) * 0.78; }
+    allowed -= prev.range / 2;                          // source may be mid-swing
+
+    let type = 'normal', range = 0, speed = 0;
+    if (!early) {
+      const r = rng.next();
+      let acc = 0;
+      if ((acc += P.pBounce) > r) type = 'bouncy';
+      else if ((acc += P.pMove) > r) type = 'moving';
+      else if (st.riskRun < 2 && (acc += P.pCrumb) > r) type = 'crumble';
+      else if (st.riskRun < 2 && (acc += P.pIce) > r) type = 'ice';
+    }
+    st.riskRun = (type === 'crumble' || type === 'ice') ? st.riskRun + 1 : 0;
+
+    if (type === 'moving') {
+      range = Math.round(rng.range(22, 26 + 52 * P.d));
+      speed = rng.range(0.5, 0.75 + 0.7 * P.d) * (rng.next() < 0.5 ? -1 : 1);
+      allowed -= range / 2;                             // target may be mid-swing too
+    }
+    if (type === 'bouncy') w = Math.max(w, 44);
+
+    /* Spikes are decided before placement: blocks get narrow at high levels,
+       so a spiked one is widened to keep a fair landing strip beside them. */
+    let spike = null;
+    if (!early && P.pSpike > 0 && (type === 'normal' || type === 'ice') && rng.chance(P.pSpike)) {
+      spike = { side: rng.sign(), frac: 0.3 };
+      w = Math.max(w, 64);
+    }
+
+    allowed = Math.max(24, allowed);
+
+    const gap = allowed * rng.range(0.12, P.spread);
+    let cx = prev.cx + st.dir * (prev.hw + w / 2 + gap);
+    const lo = w / 2 + 6 + range / 2, hi = W - w / 2 - 6 - range / 2;
+    if (cx < lo || cx > hi) {
+      st.dir = -st.dir;
+      cx = prev.cx + st.dir * (prev.hw + w / 2 + gap);
+    }
+    cx = clamp(cx, lo, Math.max(lo, hi));
+    if (rng.chance(0.22)) st.dir = -st.dir;
+
+    const p = {
+      id: idFn(), type, x: cx - w / 2, y, w, h: PLAT_T, hx: cx,
+      range, speed, phase: rng.range(0, 6.28)
+    };
+    if (spike) p.spike = spike;
+    return p;
+  }
+
   function generate(n) {
     const rng = rngFor(0x5c0FFE + n * 9176);
     const d = clamp((n - 1) / 24, 0, 1);                 // difficulty ramp, saturates at level 25
-    const dd = d * d;                                     // for things that should stay rare early
-
+    const P = paramsFor(d, n);
     const height = Math.min(4400, 1150 + n * 148);
-    const gapMin = 58 + 27 * d;
-    const gapMax = 84 + 31 * d;
-    const wMin = 68 - 26 * d;          // kept generous relative to the 18px-wide stickman
-    const wMax = 100 - 52 * d;
-    const spread = 0.42 + 0.44 * d;                       // how much of the reach a gap may use
-
-    const pMove = n >= 4 ? Math.min(0.42, (n - 3) * 0.045) : 0;
-    const pCrumb = n >= 6 ? Math.min(0.34, (n - 5) * 0.045) : 0;
-    const pIce = n >= 10 ? Math.min(0.28, (n - 9) * 0.040) : 0;
-    const pBounce = n >= 5 ? 0.07 : 0;
-    const pSpike = n >= 8 ? Math.min(0.34, (n - 7) * 0.045) : 0;
+    const gapMin = P.gapMin, gapMax = P.gapMax, spread = P.spread;
 
     const plats = [];
     let id = 0;
@@ -75,75 +143,13 @@
     plats.push({ id: id++, type: 'ground', x: 0, y: 0, w: W, h: PLAT_T, hx: W / 2 });
 
     let prev = { x: W / 2 - 60, w: 120, y: 0, cx: W / 2, hw: W / 2, range: 0 };
-    let dir = rng.sign();
-    let riskRun = 0;
+    const st = { dir: rng.sign(), riskRun: 0 };
 
     while (prev.y < height) {
-      const idx = plats.length;
-      const early = idx <= 3;                             // gentle opening on every level
-
-      /* --- size --- */
-      let w = early ? clamp(rng.range(88, 115), 70, 130)
-                    : Math.round(rng.range(wMin, wMax));
-
-      /* --- rise --- */
-      let dy = early ? rng.range(58, 76) : rng.range(gapMin, gapMax);
-      dy = clamp(dy, 40, MAX_RISE - 16);
-      const y = prev.y + dy;
-
-      /* --- how far sideways is provably survivable --- */
-      let allowed = reach(dy) * 0.78;
-      if (allowed < 0) { dy = 70; allowed = reach(70) * 0.78; }
-      allowed -= prev.range / 2;                          // source may be mid-swing
-
-      /* --- type --- */
-      let type = 'normal', range = 0, speed = 0;
-      if (!early) {
-        const r = rng.next();
-        let acc = 0;
-        if ((acc += pBounce) > r) type = 'bouncy';
-        else if ((acc += pMove) > r) type = 'moving';
-        else if (riskRun < 2 && (acc += pCrumb) > r) type = 'crumble';
-        else if (riskRun < 2 && (acc += pIce) > r) type = 'ice';
-      }
-      riskRun = (type === 'crumble' || type === 'ice') ? riskRun + 1 : 0;
-
-      if (type === 'moving') {
-        range = Math.round(rng.range(22, 26 + 52 * d));
-        speed = rng.range(0.5, 0.75 + 0.7 * d) * (rng.next() < 0.5 ? -1 : 1);
-        allowed -= range / 2;                             // target may be mid-swing too
-      }
-      if (type === 'bouncy') w = Math.max(w, 44);
-
-      /* Spikes are decided before placement: blocks get narrow at high levels,
-         so a spiked one is widened to keep a fair landing strip beside them. */
-      let spike = null;
-      if (!early && pSpike > 0 && (type === 'normal' || type === 'ice') && rng.chance(pSpike)) {
-        spike = { side: rng.sign(), frac: 0.3 };
-        w = Math.max(w, 64);
-      }
-
-      allowed = Math.max(24, allowed);
-
-      /* --- placement --- */
-      const gap = allowed * rng.range(0.12, spread);
-      let cx = prev.cx + dir * (prev.hw + w / 2 + gap);
-      const lo = w / 2 + 6 + range / 2, hi = W - w / 2 - 6 - range / 2;
-      if (cx < lo || cx > hi) {
-        dir = -dir;
-        cx = prev.cx + dir * (prev.hw + w / 2 + gap);
-      }
-      cx = clamp(cx, lo, Math.max(lo, hi));
-      if (rng.chance(0.22)) dir = -dir;
-
-      const p = {
-        id: id++, type, x: cx - w / 2, y, w, h: PLAT_T, hx: cx,
-        range, speed, phase: rng.range(0, 6.28)
-      };
-      if (spike) p.spike = spike;
-
+      const early = plats.length <= 3;                    // gentle opening on every level
+      const p = placeNext(rng, prev, st, P, early, () => id++);
       plats.push(p);
-      prev = { x: p.x, w, y, cx, hw: w / 2, range };
+      prev = { x: p.x, w: p.w, y: p.y, cx: p.hx, hw: p.w / 2, range: p.range };
     }
 
     /* --- the goal block --- */
@@ -203,6 +209,76 @@
     };
   }
 
+  /* ---------------- the endless tower ----------------
+     Same placement rules, but difficulty is a function of how high you are
+     rather than which level you picked, and it grows a chunk at a time. */
+  const ENDLESS_RAMP = 5200;        // height at which it stops getting harder
+  const endlessD = (y) => clamp(y / ENDLESS_RAMP, 0, 1);
+
+  function generateEndless(seed) {
+    const rng = rngFor((seed >>> 0) || 1);
+    const lv = {
+      endless: true, n: 0, W, plats: [], platById: {}, coins: [], saws: [],
+      theme: THEMES[Math.floor(rng.next() * THEMES.length)],
+      difficulty: 0, parTime: Infinity,
+      goalY: 5000,                  // only sizes the backdrop; there is no goal
+      top: 0, coinCount: 0, totalCoinValue: 0, seedTag: 'endless',
+      gen: { rng, id: 0, st: { dir: rng.sign(), riskRun: 0 }, prev: null }
+    };
+    const ground = { id: lv.gen.id++, type: 'ground', x: 0, y: 0, w: W, h: PLAT_T, hx: W / 2 };
+    lv.plats.push(ground);
+    lv.platById[ground.id] = ground;
+    lv.gen.prev = { x: W / 2 - 60, w: 120, y: 0, cx: W / 2, hw: W / 2, range: 0 };
+    extendEndless(lv, 2600);
+    return lv;
+  }
+
+  function extendEndless(lv, targetY) {
+    const g = lv.gen, rng = g.rng;
+    while (lv.top < targetY) {
+      const d = endlessD(g.prev.y);
+      const P = paramsFor(d, 1 + d * 24);          // same hazard schedule, keyed off height
+      const early = lv.plats.length <= 3;
+      const p = placeNext(rng, g.prev, g.st, P, early, () => g.id++);
+      lv.plats.push(p);
+      lv.platById[p.id] = p;
+      g.prev = { x: p.x, w: p.w, y: p.y, cx: p.hx, hw: p.w / 2, range: p.range };
+      lv.top = p.y;
+
+      if (!early && rng.chance(0.58)) {
+        let ox = rng.range(-p.w * 0.28, p.w * 0.28);
+        if (p.spike) ox = -p.spike.side * Math.abs(ox) * 0.8;
+        lv.coins.push({ x: p.hx + ox, y: p.y + 28, r: 7, got: false, gem: false, plat: p.id, ox });
+        lv.coinCount++; lv.totalCoinValue += 5;
+      } else if (!early && rng.chance(0.07)) {
+        lv.coins.push({ x: clamp(p.hx + rng.sign() * (p.w / 2 + 16), 20, W - 20),
+          y: p.y + rng.range(44, 70), r: 8.5, got: false, gem: true, plat: -1, ox: 0 });
+        lv.coinCount++; lv.totalCoinValue += 25;
+      }
+
+      if (d > 0.42 && rng.chance(0.05 + d * 0.09)) {
+        const r = 11, range = rng.range(45, 95);
+        const cx = clamp(p.hx + rng.range(-40, 40), range / 2 + r + 5, W - range / 2 - r - 5);
+        lv.saws.push({ x: cx, y: p.y + rng.range(26, 52), r, range,
+          speed: rng.range(0.45, 0.5 + 0.6 * d) * (rng.next() < 0.5 ? -1 : 1), phase: rng.range(0, 6.28) });
+      }
+    }
+    lv.difficulty = endlessD(lv.top);
+    return lv;
+  }
+
+  /* Everything well below the killing floor is unreachable — let it go, so a
+     long run does not grow without bound. */
+  function pruneEndless(lv, belowY) {
+    if (!lv.endless) return;
+    for (let i = lv.plats.length - 1; i >= 0; i--) {
+      const p = lv.plats[i];
+      if (p.type !== 'ground' && p.y < belowY) { lv.plats.splice(i, 1); delete lv.platById[p.id]; }
+    }
+    for (let i = lv.coins.length - 1; i >= 0; i--) if (lv.coins[i].y < belowY) lv.coins.splice(i, 1);
+    for (let i = lv.saws.length - 1; i >= 0; i--) if (lv.saws[i].y < belowY) lv.saws.splice(i, 1);
+  }
+
   /* live x of a platform / saw at time t */
   function platX(p, t) {
     if (p.type !== 'moving' || !p.range) return p.x;
@@ -210,5 +286,6 @@
   }
   function sawX(s, t) { return s.x + Math.sin(t * s.speed + s.phase) * (s.range / 2); }
 
-  SL.level = { generate, platX, sawX, THEMES, themeFor, W, PLAT_T, BASE, MAX_RISE, reach };
+  SL.level = { generate, generateEndless, extendEndless, pruneEndless, endlessD,
+    platX, sawX, THEMES, themeFor, W, PLAT_T, BASE, MAX_RISE, reach };
 })(window.SL);

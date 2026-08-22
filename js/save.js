@@ -11,6 +11,7 @@
     equip: { skin: 'skin_classic', hat: 'hat_none' },
     progress: {},          // levelNumber -> {t:bestTime, d:bestDeaths, c:bestCoins, s:stars}
     stats: { runs: 0, deaths: 0, jumps: 0, coins: 0, earned: 0, playtime: 0 },
+    endless: { best: 0 },
     settings: { sfx: true, music: false, haptic: true, lowfx: false, forceTouch: false, gore: true, blood: true },
     seen: { howto: false }
   });
@@ -31,6 +32,7 @@
         data.stats = Object.assign(base.stats, parsed.stats || {});
         data.settings = Object.assign(base.settings, parsed.settings || {});
         data.seen = Object.assign(base.seen, parsed.seen || {});
+        data.endless = Object.assign(base.endless, parsed.endless || {});
         data.upgrades = parsed.upgrades || {};
         data.progress = parsed.progress || {};
       }
@@ -91,6 +93,9 @@
     setting(k) { return data.settings[k]; },
     setSetting(k, v) { data.settings[k] = v; save(); },
 
-    bump(k, n) { data.stats[k] = (data.stats[k] || 0) + (n == null ? 1 : n); save(); }
+    bump(k, n) { data.stats[k] = (data.stats[k] || 0) + (n == null ? 1 : n); save(); },
+
+    endlessBest: () => (data.endless && data.endless.best) || 0,
+    setEndlessBest(h) { data.endless.best = h; save(); }
   };
 })(window.SL);

@@ -14,7 +14,8 @@
   const ITER = 6;                  // constraint relaxation passes
   const BOUNCE = 0.34;
   const WALL_BOUNCE = 0.45;
-  const SLIDE_KEEP = 0.985;        // horizontal speed kept per step while sliding
+  const SLIDE_KEEP = 0.985;        // horizontal speed kept per step while a corpse slides
+  const LIVE_SLIDE_KEEP = 0.88;    // a body put down on purpose grips and settles
   const GROUND_KEEP = 0.86;
   const EDGE_NUDGE = 0.0022;       // walks a stalled point toward the nearest edge
   const IMPACT_MIN = 55;           // px/s: below this it is resting contact, not a hit
@@ -56,12 +57,13 @@
 
   /* ---------------- setup ---------------- */
   function reset(S) {
-    S.gore = { rd: null, parts: [], drops: [], decals: [], t: 0 };
+    S.gore = { rd: null, parts: [], ropes: [], drops: [], decals: [], t: 0 };
   }
   function softReset(S) {          // between attempts: bodies go, the mess stays
     ensure(S);
     S.gore.rd = null;
     S.gore.parts.length = 0;
+    S.gore.ropes.length = 0;
     S.gore.drops.length = 0;
     S.gore.t = 0;
   }
@@ -188,17 +190,37 @@
   }
 
   const ORGANS = [
-    { s: 'gut', c: '#e08a9a', r: 4.6 }, { s: 'gut', c: '#d67c8c', r: 4.2 },
     { s: 'heart', c: '#a4161a', r: 3.4 }, { s: 'lung', c: '#c96b7a', r: 3.8 },
     { s: 'lung', c: '#bf5f6e', r: 3.6 }, { s: 'liver', c: '#6d1a1a', r: 3.9 },
     { s: 'gib', c: '#8f1d24', r: 2.6 }, { s: 'gib', c: '#b02330', r: 2.3 },
     { s: 'gib', c: '#7a141b', r: 2.8 }, { s: 'gib', c: '#c1121f', r: 2.1 }
   ];
+  const GUT_LINKS = 8, GUT_SEG = 3.1;
+
+  /* A length of intestine is a little Verlet rope: it slithers, drapes over
+     blocks and hangs off ledges instead of bouncing like a pebble. */
+  function makeGut(S, cx, cy, colour, force) {
+    const dt = 1 / 120;
+    const a = rnd(0, 6.283);
+    const vx = Math.cos(a) * rnd(60, 200) * force;
+    const vy = Math.abs(Math.sin(a)) * rnd(60, 190) * force;
+    const pts = [];
+    for (let i = 0; i < GUT_LINKS; i++) {
+      const x = cx + rnd(-2, 2) - Math.cos(a) * i * 0.8;
+      const y = cy + rnd(-2, 2) - Math.sin(a) * i * 0.8;
+      pts.push({
+        x, y, px: x - (vx + rnd(-30, 30)) * dt, py: y - (vy + rnd(-30, 30)) * dt,
+        r: 2.3, noClip: 0, stuckT: 0, contact: false
+      });
+    }
+    return { pts, colour, w: rnd(3.6, 4.6), wob: rnd(0, 6.28) };
+  }
 
   function spillOrgans(S, rd, cutY, force) {
     const g = S.gore;
     const cx = avgX(rd.pts);
-    const n = lowfx() ? 5 : ORGANS.length;
+    for (let i = 0; i < (lowfx() ? 1 : 2); i++) g.ropes.push(makeGut(S, cx, cutY, i ? '#d67c8c' : '#e08a9a', force));
+    const n = lowfx() ? 4 : ORGANS.length;
     for (let i = 0; i < n; i++) {
       const o = ORGANS[i];
       const a = rnd(-2.6, -0.5);
@@ -209,6 +231,7 @@
         vy: -Math.sin(a) * sp,
         r: o.r, colour: o.c, shape: o.s, wob: rnd(0, 6.28),
         rot: rnd(-1, 1), vrot: rnd(-9, 9),
+        squash: 0, squashV: 0, squashAng: 0, writhe: rnd(0.8, 1.9),
         onPlat: null, rest: false, dripT: 0, stuckT: 0, noClip: 0
       };
       g.parts.push(p);
@@ -292,6 +315,10 @@
 
   function collide(S, p, dt) {
     const plats = S.level.plats;
+    /* A corpse is meant to end up at the bottom, so it slides off ledges and
+       eventually slips through them. A body you put down on purpose is not —
+       it settles on whatever block it lands on and stays there. */
+    const alive = !!(S.gore.rd && S.gore.rd.alive);
     let vx = p.x - p.px, vy = p.y - p.py;
     p.contact = false;
 
@@ -319,9 +346,10 @@
         onImpact(S, p, impact, hit);
       } else {
         p.py = p.y;
-        p.px = p.x - vx * SLIDE_KEEP;
+        p.px = p.x - vx * (alive ? LIVE_SLIDE_KEEP : SLIDE_KEEP);
+        if (alive) { p.stuckT = 0; return; }
         p.stuckT += dt;
-        /* never let a piece settle on a ledge — it belongs at the bottom */
+        /* never let a corpse settle on a ledge — it belongs at the bottom */
         if (Math.abs(vx) < 0.3) {
           const px = LV.platX(hit, S.time);
           let dir = (p.x - px) < (px + hit.w - p.x) ? -1 : 1;
@@ -393,11 +421,49 @@
   }
 
   /* ---------------- organs + droplets ---------------- */
+  function squish(p, impact, ang) {
+    const amt = clamp(impact / 900, 0.05, 0.5);
+    if (amt > Math.abs(p.squash)) { p.squash = amt; p.squashV = 0; p.squashAng = ang; }
+  }
+
+  /* the guts: Verlet rope, same integrator and collisions as the ragdoll */
+  function stepRopes(S, dt) {
+    const g = S.gore;
+    const grav = G * dt * dt;
+    for (const rope of g.ropes) {
+      rope.wob += dt * 1.4;
+      for (const p of rope.pts) {
+        if (p.noClip > 0) p.noClip -= dt;
+        const vx = (p.x - p.px) * DAMP;
+        const vy = (p.y - p.py) * DAMP;
+        p.px = p.x; p.py = p.y;
+        p.x += vx;
+        p.y += vy - grav;
+      }
+      for (let k = 0; k < 3; k++) {
+        for (let i = 0; i < rope.pts.length - 1; i++) {
+          const a = rope.pts[i], b = rope.pts[i + 1];
+          const dx = b.x - a.x, dy = b.y - a.y;
+          const d = Math.hypot(dx, dy) || 0.0001;
+          const f = ((d - GUT_SEG) / d) * 0.5;
+          a.x += dx * f; a.y += dy * f;
+          b.x -= dx * f; b.y -= dy * f;
+        }
+        for (const p of rope.pts) collide(S, p, dt);
+      }
+    }
+  }
+
   function stepLoose(S, dt) {
     const g = S.gore;
     const plats = S.level.plats;
 
     for (const p of g.parts) {
+      /* soft bodies: the squash from the last knock springs back and overshoots,
+         and they never sit perfectly still */
+      p.squashV += (-p.squash * 900 - p.squashV * 16) * dt;
+      p.squash += p.squashV * dt;
+      p.wob += dt * p.writhe;
       if (p.rest) continue;
       if (p.noClip > 0) p.noClip -= dt;
       const py = p.y;
@@ -407,8 +473,8 @@
       p.rot += p.vrot * dt;
       p.vrot -= p.vrot * 0.5 * dt;
 
-      if (p.x < p.r) { p.x = p.r; p.vx = Math.abs(p.vx) * 0.45; }
-      else if (p.x > W - p.r) { p.x = W - p.r; p.vx = -Math.abs(p.vx) * 0.45; }
+      if (p.x < p.r) { squish(p, Math.abs(p.vx), Math.PI / 2); p.x = p.r; p.vx = Math.abs(p.vx) * 0.45; }
+      else if (p.x > W - p.r) { squish(p, Math.abs(p.vx), Math.PI / 2); p.x = W - p.r; p.vx = -Math.abs(p.vx) * 0.45; }
 
       let landed = null;
       if (p.vy <= 0 && p.noClip <= 0) {
@@ -425,6 +491,7 @@
         const impact = -p.vy;
         p.onPlat = landed;
         if (impact > 42) {
+          squish(p, impact, 0);
           p.vy = impact * 0.42; p.vx *= 0.8;
           p.vrot = p.vrot * 0.7 + p.vx * 0.05;
           if (bloodOn()) stain(S, p.x, landed.y, p.r * 0.9, landed);
@@ -435,6 +502,7 @@
         const impact = -p.vy;
         p.onPlat = 'ground';
         if (impact > 42) {
+          squish(p, impact, 0);
           p.vy = impact * 0.34; p.vx *= 0.72;
           if (bloodOn()) stain(S, p.x, 0.5, p.r * 0.9, null);
           if (p.vy < 22) p.vy = 0;
@@ -493,6 +561,7 @@
     ensure(S);
     S.gore.t += dt;
     stepRagdoll(S, dt);
+    stepRopes(S, dt);
     stepLoose(S, dt);
   }
 
@@ -535,6 +604,7 @@
   function drawParts(S, ctx, toY, time) {
     const g = S.gore;
     if (!g) return;
+    for (const rope of g.ropes) drawGut(ctx, rope, toY);
     for (const p of g.parts) drawOrgan(ctx, p, toY);
     if (g.rd) drawRagdoll(ctx, g.rd, toY, time);
     drawDrops(ctx, g.drops, toY);
@@ -624,30 +694,51 @@
     ctx.globalAlpha = 1;
   }
 
+  function drawGut(ctx, rope, toY) {
+    const pts = rope.pts;
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (let pass = 0; pass < 2; pass++) {
+      ctx.strokeStyle = pass ? rope.colour : 'rgba(90,20,30,.55)';
+      ctx.lineWidth = pass ? rope.w : rope.w + 1.6;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, toY(pts[0].y));
+      for (let i = 1; i < pts.length - 1; i++) {     // smooth it out
+        const a = pts[i], b = pts[i + 1];
+        ctx.quadraticCurveTo(a.x, toY(a.y), (a.x + b.x) / 2, toY((a.y + b.y) / 2));
+      }
+      const last = pts[pts.length - 1];
+      ctx.lineTo(last.x, toY(last.y));
+      ctx.stroke();
+    }
+    /* a wet highlight so it does not read as a rope */
+    ctx.strokeStyle = 'rgba(255,255,255,.22)';
+    ctx.lineWidth = rope.w * 0.3;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, toY(pts[0].y) - rope.w * 0.22);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, toY(pts[i].y) - rope.w * 0.22);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   function drawOrgan(ctx, p, toY) {
     const r = p.r;
     ctx.save();
     ctx.translate(p.x, toY(p.y));
     ctx.rotate(p.rot);
+    /* squash from the last knock, plus a constant slow writhe */
+    const sq = p.squash + Math.sin(p.wob) * 0.05;
+    if (sq) {
+      ctx.rotate(p.squashAng);
+      ctx.scale(1 + sq, 1 - sq * 0.85);
+      ctx.rotate(-p.squashAng);
+    }
     ctx.fillStyle = p.colour;
     ctx.strokeStyle = 'rgba(60,6,10,.55)';
     ctx.lineWidth = 0.9;
     ctx.lineCap = 'round';
-    if (p.shape === 'gut') {
-      ctx.lineWidth = r * 1.15;
-      ctx.strokeStyle = p.colour;
-      ctx.beginPath();
-      for (let i = 0; i <= 7; i++) {
-        const a = i / 7 * 6.6 + p.wob;
-        const rad = r * 1.5 * (0.55 + 0.45 * Math.sin(i * 1.7 + p.wob));
-        const x = Math.cos(a) * rad, y = Math.sin(a) * rad * 0.75;
-        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
-      }
-      ctx.stroke();
-      ctx.lineWidth = 0.8;
-      ctx.strokeStyle = 'rgba(90,20,30,.4)';
-      ctx.stroke();
-    } else if (p.shape === 'heart') {
+    if (p.shape === 'heart') {
       ctx.beginPath();
       ctx.moveTo(0, r);
       ctx.bezierCurveTo(-r * 1.6, -r * 0.2, -r * 0.55, -r * 1.4, 0, -r * 0.55);

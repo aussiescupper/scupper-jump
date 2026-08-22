@@ -36,7 +36,7 @@
     hudDirty: true
   };
 
-  const listeners = { hud: [], complete: [], toast: [], retry: [], limp: [] };
+  const listeners = { hud: [], complete: [], toast: [], retry: [], limp: [], endless: [] };
   const on = (k, fn) => listeners[k].push(fn);
   const fire = (k, p) => listeners[k].forEach(fn => fn(p));
 
@@ -52,13 +52,14 @@
   }
 
   /* ---------------- level lifecycle ---------------- */
-  function loadLevel(n, mode) {
-    S.level = LV.generate(n);
+  function loadLevel(n, mode, endless) {
+    S.level = endless ? LV.generateEndless((Math.random() * 2147483647) | 0) : LV.generate(n);
     S.backdrop = R.makeBackdrop(S.level);
     S.mods = SL.items.modifiers();
     S.run = {
       n, coins: 0, gems: 0, value: 0, deaths: 0, elapsed: 0, collected: 0,
-      replay: SL.save.cleared(n), started: false, halfway: false
+      replay: !endless && SL.save.cleared(n), started: false, halfway: false,
+      endless: !!endless, height: 0
     };
     S.checkpoint = null;
     SL.gore.reset(S);
@@ -83,6 +84,7 @@
     S.anchor = Math.max(0, spawn.y);
     S.baseCam = Math.max(MIN_CAM, S.anchor - S.followGap);
     S.camY = S.baseCam;
+    S.rising = MIN_CAM - 260;          // endless: the floor that comes after you
     S.shield = S.mods.shield;
     S.limp = false;
     S.awaitRetry = false;
@@ -376,13 +378,32 @@
       fire('toast', 'Checkpoint');
     }
 
+    /* -------- endless: keep building, and keep the floor coming -------- */
+    if (S.run.endless) {
+      if (pl.y > S.run.height) S.run.height = pl.y;
+      if (lv.top - pl.y < 2200) {
+        LV.extendEndless(lv, pl.y + 3200);
+        S.hudDirty = true;
+      }
+      if (S.run.started) {
+        const grace = Math.max(0, S.run.elapsed - 2.5);
+        const speed = Math.min(85, 22 + S.run.height / 130) * Math.min(1, grace / 2);
+        S.rising += speed * dt;
+      }
+      if (S.time - (S.lastPrune || 0) > 4) {
+        S.lastPrune = S.time;
+        LV.pruneEndless(lv, S.baseCam - 500);
+      }
+    }
+
     /* -------- camera + the floor that kills --------
        The lethal floor climbs with the highest block you have actually LANDED on,
        not with your airborne peak — otherwise a bouncer would fling you up, drag
        the floor with you, and kill you on the way back down through your own
        launch pad. The view may rise above that floor to keep you in shot, and
        slides back down as you fall. */
-    const base = S.anchor - S.followGap;
+    let base = S.anchor - S.followGap;
+    if (S.run.endless) base = Math.max(base, S.rising);
     if (base > S.baseCam) S.baseCam = damp(S.baseCam, base, 6.5, dt);
     if (S.baseCam < MIN_CAM) S.baseCam = MIN_CAM;
     const want = Math.max(S.baseCam, pl.y - R.view.h * 0.72);
@@ -482,6 +503,25 @@
     return true;
   }
 
+  function endRun() {
+    const lv = S.level, run = S.run, m = S.mods;
+    S.mode = 'complete';
+    const height = Math.floor(run.height / 10);
+    const best = SL.save.endlessBest();
+    const isBest = height > best;
+    if (isBest) SL.save.setEndlessBest(height);
+    const climbCredits = Math.round(run.height / 12);
+    const total = Math.max(1, Math.round((climbCredits + run.value) * m.payoutMul));
+    SL.save.addCredits(total);
+    SL.save.bump('runs');
+    fire('endless', {
+      height, best: Math.max(best, height), isBest,
+      coins: run.collected, coinValue: run.value,
+      climbCredits, mult: m.payoutMul, total,
+      elapsed: run.elapsed, deaths: run.deaths
+    });
+  }
+
   function respawn() {
     resetAttempt(false);
     S.hudDirty = true;
@@ -534,13 +574,19 @@
   let hudClock = 0;
   function pushHud() {
     if (!S.level) return;
+    const endless = !!(S.run && S.run.endless);
     fire('hud', {
       n: S.level.n,
+      endless,
       themeName: S.level.theme.name,
       coins: S.run ? S.run.collected : 0,
-      coinTotal: S.level.coins.length,
+      coinTotal: endless ? 0 : S.level.coins.length,
       deaths: S.run ? S.run.deaths : 0,
-      progress: clamp(S.player.y / Math.max(1, S.level.goalY), 0, 1)
+      height: endless ? Math.floor(S.run.height / 10) : 0,
+      /* in endless the rail is a danger meter: how close the floor is */
+      progress: endless
+        ? clamp(1 - (S.player.y - S.baseCam) / Math.max(1, S.followGap), 0, 1)
+        : clamp(S.player.y / Math.max(1, S.level.goalY), 0, 1)
     });
   }
 
@@ -603,9 +649,13 @@
     /* Nothing tidies the body away on its own — the player has to say when. */
     retry() {
       if (!S.player || !S.player.dead || !S.awaitRetry) return false;
+      S.awaitRetry = false;
+      fire('retry', null);
+      if (S.run && S.run.endless) { endRun(); return true; }   // one life per run
       respawn();
       return true;
     },
+    startEndless() { loadLevel(0, 'play', true); input.jumpEdge = false; },
     get awaitingRetry() { return !!S.awaitRetry && !!S.player && S.player.dead; },
     restart() {
       const n = S.level ? S.level.n : 1;
@@ -618,8 +668,9 @@
     toMenu() { S.mode = 'menu'; },
     setKey, setTouch, toggleLimp,
     get limp() { return S.limp; },
-    /* headless single step — used by the playtest bot and by tests, not by the loop */
-    tick(dt) { if (S.level) step(dt); },
+    /* headless single step — used by the playtest bot and by tests, not by the
+       loop. Ages particles too, or a headless run accumulates them forever. */
+    tick(dt) { if (S.level) { step(dt); R.stepParts(dt); } },
     get mode() { return S.mode; },
     startLoop() { if (!raf) { last = 0; raf = requestAnimationFrame(loop); } },
     refreshMods() { S.mods = SL.items.modifiers(); if (S.player) S.player.jumpsLeft = Math.max(S.player.jumpsLeft, 0); }
