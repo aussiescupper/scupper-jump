@@ -356,10 +356,9 @@
       build: SL.save.equipped('build'), face: SL.save.equipped('face'),
       pose: 'idle', phase: 1.1, facing: 1, t: 0.6
     });
-    SL.doodle.paint(x, SL.doodle.strokes());
-    if (drawState.pts && drawState.pts.length >= 4) {
-      SL.doodle.paint(x, [{ c: drawState.colour, w: drawState.size, p: drawState.pts }]);
-    }
+    /* masked, so what you see going down is exactly what sticks */
+    SL.doodle.preview(x, drawState.pts && drawState.pts.length >= 4
+      ? { c: drawState.colour, w: drawState.size, p: drawState.pts } : null);
     $('#draw-hint').hidden = SL.doodle.has() || !!drawState.pts;
   }
 
@@ -421,9 +420,9 @@
     const finish = (e) => {
       if (e.pointerId !== id || !drawState.pts) return;
       id = null;
-      SL.doodle.add(drawState.colour, drawState.size, drawState.pts);
+      const stuck = SL.doodle.add(drawState.colour, drawState.size, drawState.pts);
       drawState.pts = null;
-      SL.audio.play('ui');
+      SL.audio.play(stuck ? 'ui' : 'nope');
       paintPad();
     };
     cv.addEventListener('pointerup', finish);

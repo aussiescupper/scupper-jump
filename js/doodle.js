@@ -6,7 +6,11 @@
 
    Replaying the strokes on every figure on every frame would be daft, so they
    are baked once into an offscreen canvas and blitted. The bake is thrown away
-   whenever the drawing changes, and nowhere else. */
+   whenever the drawing changes, and nowhere else.
+
+   The ink only marks the figure. Everything is masked against his silhouette,
+   in the bake and in the pad alike, so what you watch going down is what
+   sticks. */
 (function (SL) {
   'use strict';
 
@@ -22,7 +26,10 @@
     '#c9a4ff', '#ff8a3d', '#e9eefb', '#0a0e18'];
   const SIZES = [0.7, 1.5, 3.0];
 
-  let baked = null;                   // the offscreen canvas, or null if stale
+  const DILATE = 0.9;                 // units of slack round the silhouette
+
+  let baked = null, bakedFor = '';     // the offscreen canvas, or null if stale
+  let maskC = null, maskFor = '', maskBits = null, layerC = null;
 
   const store = () => {
     const d = SL.save.data;
@@ -36,8 +43,83 @@
 
   function invalidate() { baked = null; }
 
-  /** Add one stroke: {c, w, p:[x,y,x,y,…]} in local units. */
+  /* ---------------- what counts as "on the body" ----------------
+     The pen marks the figure, not the air around him. The mask is his
+     silhouette in the pose the pad shows, fattened a touch so a line down an
+     arm does not have to be pixel-perfect, and with the head filled in so a
+     face is drawable. It depends on the build, so it is rebuilt when that
+     changes and at no other time. */
+  const buildKey = () => (SL.save.equipped('build') || 'build_classic');
+
+  function mask() {
+    const key = buildKey();
+    if (maskC && maskFor === key) return maskC;
+    const fig = document.createElement('canvas');
+    fig.width = W * PX; fig.height = H * PX;
+    const fx = fig.getContext('2d');
+    fx.setTransform(PX, 0, 0, PX, -X0 * PX, -Y0 * PX);
+    SL.stick.draw(fx, {
+      colour: '#ffffff', hat: null, face: 'face_blank', build: key,
+      pose: 'idle', phase: 1.1, facing: 1, t: 0.6, mask: true
+    });
+
+    const c = document.createElement('canvas');
+    c.width = W * PX; c.height = H * PX;
+    const x = c.getContext('2d');
+    const d = DILATE * PX;
+    for (let i = 0; i < 8; i++) {          // cheap dilation: the same shape, ringed
+      const a = (i / 8) * Math.PI * 2;
+      x.drawImage(fig, Math.cos(a) * d, Math.sin(a) * d);
+    }
+    x.drawImage(fig, 0, 0);
+
+    maskC = c; maskFor = key;
+    maskBits = x.getImageData(0, 0, c.width, c.height).data;
+    return c;
+  }
+
+  /** Is this local point on him? Used to throw away strokes drawn in mid-air. */
+  function onBody(lx, ly) {
+    mask();
+    const px = Math.round((lx - X0) * PX), py = Math.round((ly - Y0) * PX);
+    if (px < 0 || py < 0 || px >= W * PX || py >= H * PX) return false;
+    return maskBits[(py * W * PX + px) * 4 + 3] > 40;
+  }
+
+  /** Paint a stroke list into an offscreen layer with the body mask applied. */
+  function masked(list) {
+    if (!layerC) {
+      layerC = document.createElement('canvas');
+      layerC.width = W * PX; layerC.height = H * PX;
+    }
+    const x = layerC.getContext('2d');
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    x.globalCompositeOperation = 'source-over';
+    x.clearRect(0, 0, layerC.width, layerC.height);
+    x.setTransform(PX, 0, 0, PX, -X0 * PX, -Y0 * PX);
+    paint(x, list);
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    x.globalCompositeOperation = 'destination-in';
+    x.drawImage(mask(), 0, 0);
+    x.globalCompositeOperation = 'source-over';
+    return layerC;
+  }
+
+  /** The drawing as it will look, plus a stroke still being drawn. */
+  function preview(ctx, extra) {
+    const list = extra ? strokes().concat([extra]) : strokes();
+    if (!list.length) return;
+    ctx.drawImage(masked(list), X0, Y0, W, H);
+  }
+
+  /** Add one stroke: {c, w, p:[x,y,x,y,…]} in local units. Anything drawn
+      entirely off the body is dropped, so undo never appears to do nothing. */
   function add(colour, width, pts) {
+    let lands = false;
+    for (let i = 0; i < pts.length; i += 2) {
+      if (onBody(pts[i], pts[i + 1])) { lands = true; break; }
+    }
+    if (!lands) return false;
     if (pts.length < 4) {
       /* a tap is a dot, which is a stroke of one point doubled */
       if (pts.length < 2) return;
@@ -49,6 +131,7 @@
     while (s.length > MAX_STROKES) s.shift();
     invalidate();
     SL.save.flush();
+    return true;
   }
 
   /** Drop points evenly until the stroke fits, keeping both ends. */
@@ -99,13 +182,12 @@
   /** The baked canvas, or null when there is nothing drawn. */
   function canvas() {
     if (!has()) return null;
-    if (baked) return baked;
+    if (baked && bakedFor === buildKey()) return baked;
     const c = document.createElement('canvas');
     c.width = W * PX; c.height = H * PX;
-    const x = c.getContext('2d');
-    x.setTransform(PX, 0, 0, PX, -X0 * PX, -Y0 * PX);
-    paint(x, strokes());
+    c.getContext('2d').drawImage(masked(strokes()), 0, 0);
     baked = c;
+    bakedFor = buildKey();
     return baked;
   }
 
@@ -123,7 +205,7 @@
   }
 
   SL.doodle = {
-    add, undo, clear, canvas, stamp, paint, has, owned, invalidate,
-    strokes, COLOURS, SIZES, X0, X1, Y0, Y1, W, H
+    add, undo, clear, canvas, stamp, paint, preview, mask, onBody, has, owned,
+    invalidate, strokes, COLOURS, SIZES, X0, X1, Y0, Y1, W, H
   };
 })(window.SL);

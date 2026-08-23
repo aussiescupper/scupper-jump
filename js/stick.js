@@ -406,6 +406,9 @@
     ctx.beginPath();
     ctx.arc(p.lean * 1.4, HEAD_Y + D, HEAD_R * b.head, 0, Math.PI * 2);
     ctx.stroke();
+    /* the head is normally an outline. For a silhouette it has to be solid, or
+       the marker pen would let you draw a ring round the face but not a face. */
+    if (o.mask) ctx.fill();
     if (fx === 'ghost') { ctx.globalAlpha *= 0.35; ctx.fill(); ctx.globalAlpha /= 0.35; }
 
     /* the face */

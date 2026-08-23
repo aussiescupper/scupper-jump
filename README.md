@@ -208,8 +208,15 @@ Harbour Lights, Uluru at Dusk, Snowy Peaks, Southern Cross.
 | Guardian | start each attempt with a shield that soaks one hazard |
 | Checkpoint Beacon | respawn at the halfway mark instead of the bottom |
 
-The **Marker Pen** (450) unlocks the Draw tab, which is a sketchpad rather than a shelf. Whatever
-you scribble is kept as strokes in the stickman's own local units — the same space `SL.stick` draws
+The **Marker Pen** (450) unlocks the Draw tab, which is a sketchpad rather than a shelf. The ink
+only marks the figure: everything is masked against his silhouette, so a stroke that runs off him
+stops dead at the outline and one drawn entirely in mid-air is refused rather than stored invisibly.
+The mask is his idle-pose outline fattened by about a unit — enough slack that a line down an arm
+need not be pixel-perfect — with the head filled in so a face is drawable. It depends on the build,
+so it is rebuilt when that changes and at no other time. The pad shows the masked result as you
+draw, so what you watch going down is what sticks.
+
+Whatever you scribble is kept as strokes in the stickman's own local units — the same space `SL.stick` draws
 in, feet at the origin — so it travels into every mode at every size without being re-fitted, and
 mirrors with him when he turns round. Replaying strokes per figure per frame would be daft, so they
 are baked once into an offscreen canvas and blitted; the bake is thrown away only when the drawing
