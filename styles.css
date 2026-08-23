@@ -410,6 +410,33 @@ kbd{background:rgba(255,255,255,.10);border:1px solid var(--line2);border-bottom
 }
 #btn-attack.on,#btn-attack:active{background:rgba(255,93,108,.45);transform:scale(.93)}
 
+/* ============ Stick Ops ============ */
+.btn-ops{
+  background:linear-gradient(180deg,rgba(61,220,151,.17),rgba(61,220,151,.09));
+  border-color:rgba(61,220,151,.44);color:#8dffc9;
+}
+.btn-ops small{font-size:12px;font-weight:700;color:var(--dim);letter-spacing:0}
+#ops-controls{
+  position:absolute;right:calc(18px + var(--safe-r));bottom:calc(22px + var(--safe-b));
+  display:flex;flex-direction:column;align-items:flex-end;gap:10px;
+  pointer-events:none;
+}
+#btn-ops-fire{
+  pointer-events:auto;cursor:pointer;padding:0;
+  width:var(--tap-jump);height:var(--tap-jump);border-radius:50%;
+  background:rgba(255,93,108,.18);border:2px solid rgba(255,93,108,.5);
+  color:#ff9aa3;font-size:calc(var(--tap-jump) * .36);line-height:1;
+  display:grid;place-items:center;transition:transform .06s,background .1s;
+}
+#btn-ops-fire.on,#btn-ops-fire:active{background:rgba(255,93,108,.45);transform:scale(.93)}
+#btn-ops-gun{
+  pointer-events:auto;cursor:pointer;font-family:inherit;font-weight:800;font-size:12px;
+  padding:9px 14px;min-height:38px;border-radius:12px;
+  background:rgba(10,14,25,.66);border:1.5px solid var(--line2);color:var(--txt);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+}
+#btn-ops-gun:active{transform:scale(.95)}
+
 /* ============ endless ============ */
 .btn-endless{background:linear-gradient(180deg,rgba(201,164,255,.18),rgba(201,164,255,.10));
   border-color:rgba(201,164,255,.45);color:#dcc6ff}

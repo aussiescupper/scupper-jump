@@ -15,6 +15,7 @@
     stats: { runs: 0, deaths: 0, jumps: 0, coins: 0, earned: 0, playtime: 0 },
     endless: { best: 0 },
     arena: { best: 0 },
+    ops: { best: 0 },
     settings: { sfx: true, music: false, haptic: true, lowfx: false, forceTouch: false, gore: true, blood: true },
     seen: { howto: false }
   });
@@ -37,6 +38,7 @@
         data.seen = Object.assign(base.seen, parsed.seen || {});
         data.endless = Object.assign(base.endless, parsed.endless || {});
         data.arena = Object.assign(base.arena, parsed.arena || {});
+        data.ops = Object.assign(base.ops, parsed.ops || {});
         data.upgrades = parsed.upgrades || {};
         data.progress = parsed.progress || {};
       }
@@ -103,6 +105,8 @@
     setEndlessBest(h) { data.endless.best = h; save(); },
 
     arenaBest: () => (data.arena && data.arena.best) || 0,
-    setArenaBest(w) { data.arena.best = w; save(); }
+    setArenaBest(w) { data.arena.best = w; save(); },
+    opsBest: () => (data.ops && data.ops.best) || 0,
+    setOpsBest(w) { data.ops.best = w; save(); }
   };
 })(window.SL);

@@ -10,6 +10,18 @@
   let canvas = null, ctx = null;
   const view = { w: VW, h: 560, scale: 1, ox: 0, oy: 0, cssW: 0, cssH: 0, dpr: 1 };
 
+  /** The first-person column: letterboxed the same way, but SL.fps owns the pixels. */
+  function frameFps(S) {
+    ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+    ctx.fillStyle = '#05070e';
+    ctx.fillRect(0, 0, view.cssW, view.cssH);
+    ctx.save();
+    ctx.setTransform(view.dpr * view.scale, 0, 0, view.dpr * view.scale, view.ox * view.dpr, view.oy * view.dpr);
+    ctx.beginPath(); ctx.rect(0, 0, view.w, view.h); ctx.clip();
+    SL.fps.draw(ctx, S, view, S.time);
+    ctx.restore();
+  }
+
   /* ---------- setup / resize ---------- */
   function setup(cv) {
     canvas = cv;
@@ -424,6 +436,8 @@
 
   /* ---------- the whole frame ---------- */
   function frame(S) {
+    /* Stick Ops paints the whole column itself — there is no 2D world to draw */
+    if (S.mode === 'fps' || (S.level && S.level.fps)) { frameFps(S); return; }
     const lv = S.level, th = lv.theme, t = S.time, camY = S.camY;
     const toY = (wy) => view.h - (wy - camY);
 

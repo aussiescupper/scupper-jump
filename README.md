@@ -96,6 +96,36 @@ It uses the ordinary platformer physics, so moving and jumping feel exactly as t
 Payouts are tuned against the other modes: an expert minute earns about 590, against the Smash
 Lab's 495 and a level's 150–350.
 
+### Stick Ops
+
+The first-person mode. A raycaster in the Wolfenstein mould — one ray per screen column, DDA
+through a 24×24 grid, one vertical slice of wall drawn per hit — and since everything that is not a
+wall is a billboard, the billboards are the same stick figures as everywhere else, hats and faces
+and builds intact. Nothing here is an image file: the four wall textures are drawn into offscreen
+canvases at boot, the same way every sound is synthesised.
+
+Waves come at you in a maze that is generated fresh each run. Blocks are dropped in at random and
+any block that would wall part of the floor off is taken straight back out, so there is never a
+room you cannot walk out of. Two sorts of people want a word:
+
+| | |
+|---|---|
+| Bruiser | walks in and swings |
+| Gunner | hangs back and shoots, and sidesteps while doing it (from wave 2) |
+
+They find you with a breadth-first flood from your own cell — every open square records how many
+steps it is back to you, so anyone who has lost sight of you walks the corridors instead of milling
+about in a corner. It is recomputed a few times a second; the map is only 576 cells.
+
+Three weapons: the **Pistol** never runs out, the **SMG** is automatic, and the **Shotgun** throws
+eight pellets. The last two come off the floor along with medkits, which is the reason to leave the
+corner you like. Clearing a wave pays a bonus on top of the kills.
+
+On a keyboard: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to move, <kbd>Q</kbd>/<kbd>E</kbd>
+or the arrows to turn, click for the mouse look (it takes the pointer lock), <kbd>1</kbd>–<kbd>3</kbd>
+or the scroll wheel to change weapon. On a touch screen the column splits down the middle — drag the
+left half to walk, the right half to look, and there is a fire button in the corner.
+
 ### Smash Lab
 
 A plain padded room — floor, two walls, a ceiling, nothing else. Stick figures **stand about on
@@ -203,6 +233,7 @@ renderer that draws the stickman in game.
 |---|---|
 | Move | <kbd>A</kbd>/<kbd>D</kbd> or <kbd>←</kbd>/<kbd>→</kbd> |
 | Punch | <kbd>F</kbd>, <kbd>X</kbd> or <kbd>Shift</kbd> — bystanders on blocks, and the Fight Pit |
+| Shoot (Stick Ops) | click, <kbd>Space</kbd>, <kbd>F</kbd>, <kbd>X</kbd> or <kbd>Shift</kbd> |
 | Jump | <kbd>Space</kbd>, <kbd>W</kbd> or <kbd>↑</kbd> — **hold for a higher jump** |
 | Go limp / get up | <kbd>R</kbd>, or the stickman button at the bottom of the screen |
 | Pause | <kbd>Esc</kbd> or <kbd>P</kbd> |
@@ -279,6 +310,7 @@ js/save.js          localStorage-backed progress
 js/audio.js         WebAudio synth — every sound is generated, no audio files
 js/items.js         shop catalogue + the modifiers it feeds to the physics
 js/stick.js         the stickman renderer (game canvas AND shop previews)
+js/fps.js           Stick Ops: the raycaster, the maze, and the people in it
 js/props.js         smash lab props: swings, cuts, blenders, bombs
 js/lab.js           the smash lab: a room, some bodies, and a wallet
 js/level.js         procedural towers, the endless tower, the reachability proof

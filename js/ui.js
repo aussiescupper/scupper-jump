@@ -71,6 +71,8 @@
     $('#btn-endless-best').textContent = best ? '· best ' + fmtNum(best) + 'm' : '';
     const wb = SL.save.arenaBest();
     $('#btn-arena-best').textContent = wb ? '· best wave ' + fmtNum(wb) : '';
+    const ob = SL.save.opsBest();
+    $('#btn-ops-best').textContent = ob ? '· best wave ' + fmtNum(ob) : '';
   }
 
   /* ---------------- level select ---------------- */
@@ -361,7 +363,7 @@
   function bindHud() {
     SL.game.on('hud', (h) => {
       const lvl = $('#hud-level');
-      const txt = h.lab ? 'Smash Lab' : h.arena ? 'Fight Pit'
+      const txt = h.lab ? 'Smash Lab' : h.arena ? 'Fight Pit' : h.fps ? 'Stick Ops'
         : (h.endless ? 'Endless · ' + h.themeName : 'Lvl ' + h.n + ' · ' + h.themeName);
       if (lvl.textContent !== txt) lvl.textContent = txt;
       $('#hud-coin-n').textContent = h.coins;
@@ -371,8 +373,8 @@
       $('#hud-height').hidden = !h.endless;
       $('#hud-lab-n').textContent = fmtNum(h.labEarned);
       $('#hud-lab').hidden = !h.lab;
-      $('#hud-deaths').hidden = !!h.endless || !!h.lab || !!h.arena;
-      $('#hud-coins').hidden = !!h.lab || !!h.arena;
+      $('#hud-deaths').hidden = !!h.endless || !!h.lab || !!h.arena || !!h.fps;
+      $('#hud-coins').hidden = !!h.lab || !!h.arena || !!h.fps;
       /* nothing to drive in the lab — get the controls out of the way */
       $('#btn-ragdoll').hidden = !!h.lab;
       $('.climb-rail').hidden = !!h.lab;
@@ -380,11 +382,24 @@
       if (!h.lab && !$('#prop-tray').hidden) toggleTray(false);
       if (h.lab) document.getElementById('touch').hidden = true;
       /* fight pit: health bar, wave, purse, and a fist instead of go-limp */
-      $('#hud-wave-n').textContent = h.wave;
-      $('#hud-wave').hidden = !h.arena;
-      $('#hud-cash-n').textContent = fmtNum(h.arenaEarned);
-      $('#hud-cash').hidden = !h.arena;
-      $('#hp-bar').hidden = !h.arena;
+      $('#hud-wave-n').textContent = h.fps ? h.opsWave : h.wave;
+      $('#hud-wave').hidden = !(h.arena || h.fps);
+      $('#hud-cash-n').textContent = fmtNum(h.fps ? h.opsEarned : h.arenaEarned);
+      $('#hud-cash').hidden = !(h.arena || h.fps);
+      $('#hp-bar').hidden = !(h.arena || h.fps);
+      /* first person: no climb rail, no ragdoll, its own fire controls */
+      $('#ops-controls').hidden = !(h.fps && touchWanted());
+      if (h.fps) {
+        const frac = clampPct(h.hp / Math.max(1, h.hpMax));
+        $('#hp-fill').style.width = frac + '%';
+        $('#hp-fill').classList.toggle('low', h.hp / Math.max(1, h.hpMax) < 0.35);
+        $('#btn-ragdoll').hidden = true;
+        $('.climb-rail').hidden = true;
+        document.getElementById('touch').hidden = true;
+        const gn = $('#ops-gun-name');
+        const label = h.opsAmmo || '';
+        if (gn.textContent !== label) gn.textContent = label;
+      }
       if (h.arena) {
         const frac = clampPct(h.hp / Math.max(1, h.hpMax));
         $('#hp-fill').style.width = frac + '%';
@@ -392,7 +407,7 @@
         $('#btn-ragdoll').hidden = true;
         $('.climb-rail').hidden = true;
       }
-      $('#btn-attack').hidden = !(touchWanted() && !h.lab);
+      $('#btn-attack').hidden = !(touchWanted() && !h.lab && !h.fps);
       $('#hud-coin-sep').hidden = !!h.endless;
       $('#hud-coin-t').hidden = !!h.endless;
       $('#climb-fill').style.height = (h.progress * 100).toFixed(1) + '%';
@@ -409,6 +424,7 @@
     SL.game.on('limp', paintRagdollBtn);
     SL.game.on('endless', showEndless);
     SL.game.on('arena', showArena);
+    SL.game.on('ops', showOps);
     paintRagdollBtn(false);
   }
 
@@ -451,6 +467,30 @@
     $('#pit-total').textContent = '+' + fmtNum(res.earned);
     $$('.screen').forEach(sc => sc.classList.toggle('active', sc.id === 'screen-arena'));
     current = 'arena';
+    document.getElementById('touch').hidden = true;
+    document.getElementById('hud').hidden = true;
+    walletAll();
+  }
+
+  /* ---------------- Stick Ops run over ---------------- */
+  function showOps(res) {
+    if (!res) return;
+    $('#ops-title').textContent = res.isBest ? 'Best run yet!' : 'You went down';
+    $('#ops-crown').textContent = res.isBest ? '★' : '🎯';
+    $('#ops-wave').textContent = fmtNum(res.wave);
+    const tally = $('#ops-tally');
+    tally.innerHTML = '';
+    const row = (k, v) => {
+      const d = el('div');
+      d.appendChild(el('span', null, k));
+      d.appendChild(el('b', null, v));
+      tally.appendChild(d);
+    };
+    row('Best run', fmtNum(res.best));
+    row('Dropped', fmtNum(res.kills));
+    $('#ops-total').textContent = '+' + fmtNum(res.earned);
+    $$('.screen').forEach(sc => sc.classList.toggle('active', sc.id === 'screen-ops'));
+    current = 'ops';
     document.getElementById('touch').hidden = true;
     document.getElementById('hud').hidden = true;
     walletAll();
@@ -542,11 +582,21 @@
     SL.game.startArena();
   }
 
+  function playOps() {
+    hideScreens(true);
+    SL.game.startFps();
+  }
+
   function bind() {
     $('#btn-play').addEventListener('click', () => { SL.audio.play('ui'); playLevel(SL.save.data.unlocked); });
     $('#btn-endless').addEventListener('click', () => { SL.audio.play('ui'); playEndless(); });
     $('#btn-lab').addEventListener('click', () => { SL.audio.play('ui'); playLab(); });
     $('#btn-arena').addEventListener('click', () => { SL.audio.play('ui'); playArena(); });
+    $('#btn-ops').addEventListener('click', () => { SL.audio.play('ui'); playOps(); });
+    $('#btn-ops-again').addEventListener('click', () => { SL.audio.play('ui'); playOps(); });
+    $('#btn-ops-shop').addEventListener('click', () => { SL.audio.play('ui'); stack.length = 0; stack.push('title'); show('shop', false); });
+    $('#btn-ops-menu').addEventListener('click', () => { SL.audio.play('back'); SL.game.showcase(SL.save.data.unlocked); show('title', false); });
+    $('#btn-ops-gun').addEventListener('click', (e) => { e.stopPropagation(); SL.audio.unlock(); SL.fps.cycleGun(1); });
     $('#btn-pit-again').addEventListener('click', () => { SL.audio.play('ui'); playArena(); });
     $('#btn-pit-shop').addEventListener('click', () => { SL.audio.play('ui'); stack.length = 0; stack.push('title'); show('shop', false); });
     $('#btn-pit-menu').addEventListener('click', () => { SL.audio.play('back'); SL.game.showcase(SL.save.data.unlocked); show('title', false); });

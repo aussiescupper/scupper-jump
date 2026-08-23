@@ -48,6 +48,10 @@
       <div id="prop-list"></div>
       <button class="lab-btn lab-btn-clear" id="btn-props-clear">✕ Clear props</button>
     </div>
+    <div id="ops-controls" hidden>
+      <button id="btn-ops-fire" aria-label="Fire">◉</button>
+      <button id="btn-ops-gun" aria-label="Change weapon"><span id="ops-gun-name">Pistol</span></button>
+    </div>
     <div id="lab-controls" hidden>
       <button class="lab-btn" id="btn-lab-spawn">＋ Spawn</button>
       <button class="lab-btn lab-btn-props" id="btn-lab-props">🧰 Props</button>
@@ -91,6 +95,7 @@
           <button class="btn btn-primary" id="btn-play">▶ <span id="btn-play-label">Play</span></button>
           <button class="btn btn-endless" id="btn-endless">♾ Endless <span id="btn-endless-best"></span></button>
           <button class="btn btn-arena" id="btn-arena">✊ Fight Pit <span id="btn-arena-best"></span></button>
+          <button class="btn btn-ops" id="btn-ops">🎯 <span>Stick Ops</span> <small id="btn-ops-best"></small></button>
           <button class="btn btn-lab" id="btn-lab">🔨 Smash Lab</button>
           <div class="menu-row">
             <button class="btn" id="btn-levels">🗺 Levels</button>
@@ -203,6 +208,23 @@
     </section>
 
     <!-- Fight over -->
+    <section class="screen" id="screen-ops">
+      <div class="sheet sheet-sm">
+        <div class="endless-crown" id="ops-crown">🎯</div>
+        <h2 class="centre" id="ops-title">You went down</h2>
+        <div class="end-height"><b id="ops-wave">0</b><span>waves cleared</span></div>
+        <div class="tally" id="ops-tally"></div>
+        <div class="payout"><span>Stick Credits</span><b id="ops-total">+0</b></div>
+        <div class="menu">
+          <button class="btn btn-primary" id="btn-ops-again">🎯 Go again</button>
+          <div class="menu-row">
+            <button class="btn" id="btn-ops-shop">🛒 Shop</button>
+            <button class="btn btn-ghost" id="btn-ops-menu">Menu</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="screen" id="screen-arena">
       <div class="sheet sheet-sm">
         <div class="endless-crown" id="pit-crown">✊</div>
@@ -280,6 +302,7 @@
 <script src="js/level.js"></script>
 <script src="js/props.js"></script>
 <script src="js/lab.js"></script>
+<script src="js/fps.js"></script>
 <script src="js/arena.js"></script>
 <script src="js/gore.js"></script>
 <script src="js/render.js"></script>

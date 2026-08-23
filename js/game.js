@@ -35,7 +35,7 @@
     hudDirty: true
   };
 
-  const listeners = { hud: [], complete: [], toast: [], retry: [], limp: [], endless: [], arena: [] };
+  const listeners = { hud: [], complete: [], toast: [], retry: [], limp: [], endless: [], arena: [], ops: [] };
   const on = (k, fn) => listeners[k].push(fn);
   const fire = (k, p) => listeners[k].forEach(fn => fn(p));
 
@@ -652,17 +652,35 @@
   }
 
   /* ---------------- hud ---------------- */
+  /* One first-person step. Shared by the loop and by tick(), so the headless
+     harness and the running game go down exactly the same path — keeping two
+     copies is how the run-over card came to fire in one and not the other. */
+  function stepFps(dt) {
+    S.time += dt;
+    SL.fps.step(S, dt);
+    /* nothing to watch go down here, so the card comes up on its own */
+    if (S.ops && S.ops.over && !S.ops.carded) {
+      S.ops.overT = (S.ops.overT || 0) + dt;
+      if (S.ops.overT > 1.4) { S.ops.carded = true; fire('ops', S.ops.result); }
+    }
+  }
+
   let hudClock = 0;
   function pushHud() {
     if (!S.level) return;
     const endless = !!(S.run && S.run.endless);
     const lab = !!(S.run && S.run.lab);
     const arena = !!(S.run && S.run.arena);
+    const fps = !!(S.run && S.run.fps);
+    const ops = S.ops;
     fire('hud', {
       n: S.level.n,
-      endless, lab, arena,
-      hp: arena && S.arena ? S.arena.hp : 0,
-      hpMax: arena && S.arena ? S.arena.hpMax : 1,
+      endless, lab, arena, fps,
+      opsWave: fps && ops ? ops.wave : 0,
+      opsEarned: fps && ops ? ops.earned : 0,
+      opsAmmo: fps && ops ? SL.fps.ammoLabel() : '',
+      hp: fps && ops ? ops.hp : (arena && S.arena ? S.arena.hp : 0),
+      hpMax: fps && ops ? ops.hpMax : (arena && S.arena ? S.arena.hpMax : 1),
       wave: arena && S.arena ? S.arena.wave : 0,
       arenaEarned: arena && S.arena ? S.arena.earned : 0,
       labEarned: lab && S.lab ? S.lab.earned : 0,
@@ -690,7 +708,8 @@
     if (dt > 0.25) dt = 0.25;
 
     if (S.mode === 'play') pollGamepad();
-    const running = S.mode === 'play' || S.mode === 'menu' || S.mode === 'complete' || S.mode === 'lab';
+    const running = S.mode === 'play' || S.mode === 'menu' || S.mode === 'complete'
+      || S.mode === 'lab' || S.mode === 'fps';
     if (running) {
       acc += dt;
       let guard = 0;
@@ -699,15 +718,16 @@
         if (S.mode === 'menu') { S.time += STEP; idleStep(STEP); }
         else if (S.mode === 'complete') { S.time += STEP; R.stepParts(STEP); }
         else if (S.mode === 'lab') { S.time += STEP; SL.lab.step(S, STEP); }
+        else if (S.mode === 'fps') stepFps(STEP);
         else step(STEP);
       }
       if (S.mode !== 'menu') R.stepParts(dt);
-      if (S.mode === 'play') SL.save.data.stats.playtime += dt;
+      if (S.mode === 'play' || S.mode === 'fps') SL.save.data.stats.playtime += dt;
     }
 
     if (S.level) R.frame(S);
     hudClock += dt;
-    if (S.hudDirty || ((S.mode === 'play' || S.mode === 'lab') && hudClock > 0.08)) { pushHud(); hudClock = 0; S.hudDirty = false; }
+    if (S.hudDirty || ((S.mode === 'play' || S.mode === 'lab' || S.mode === 'fps') && hudClock > 0.08)) { pushHud(); hudClock = 0; S.hudDirty = false; }
   }
 
   /* menu: the stickman idles on the ground behind the panels — just enough
@@ -789,6 +809,27 @@
       return true;
     },
 
+    /* Stick Ops: first person, no climbing at all. It draws itself and keeps
+       its own world, but the rest of the game expects an S.level to exist. */
+    startFps() {
+      S.mods = SL.items.modifiers();
+      S.level = { fps: true, endless: false, lab: false, n: 0, W: LV.W, plats: [], platById: {},
+                  coins: [], saws: [], folk: [], theme: LV.THEMES[4], difficulty: 0,
+                  parTime: Infinity, goalY: 1, top: 0, coinCount: 0, totalCoinValue: 0,
+                  seedTag: 'ops' };
+      SL.fps.start(S);
+      S.player = newPlayer(-500, -500);
+      S.run = { n: 0, coins: 0, gems: 0, value: 0, deaths: 0, elapsed: 0, collected: 0,
+                replay: false, started: true, halfway: false, endless: false, height: 0,
+                lab: false, arena: false, fps: true };
+      S.camY = MIN_CAM; S.baseCam = MIN_CAM; S.anchor = 0; S.rising = MIN_CAM - 999;
+      S.limp = false; S.awaitRetry = false;
+      SL.gore.reset(S);        // valid but empty: nulling it breaks anything that reads S.gore.old
+      S.mode = 'fps';
+      S.hudDirty = true;
+      pushHud();
+    },
+
     /* The smash lab: no climbing, no goal, just a room and a wallet. */
     startLab() {
       S.mods = SL.items.modifiers();
@@ -808,6 +849,7 @@
       /* endless and the lab have no level number to reload — start them afresh */
       const from = S.mode === 'pause' ? S.pausedFrom : S.mode;
       if (from === 'lab') { api.startLab(); return; }
+      if (from === 'fps') { api.startFps(); return; }
       if (S.run && S.run.arena) { api.startArena(); return; }
       if (S.run && S.run.endless) { api.startEndless(); return; }
       const n = S.level ? S.level.n : 1;
@@ -816,7 +858,7 @@
     },
     nextLevel() { api.start((S.level ? S.level.n : 0) + 1); },
     pause() {
-      if (S.mode === 'play' || S.mode === 'lab') { S.pausedFrom = S.mode; S.mode = 'pause'; return true; }
+      if (S.mode === 'play' || S.mode === 'lab' || S.mode === 'fps') { S.pausedFrom = S.mode; S.mode = 'pause'; return true; }
       return false;
     },
     resume() {
@@ -833,6 +875,7 @@
     tick(dt) {
       if (!S.level) return;
       if (S.mode === 'lab') { S.time += dt; SL.lab.step(S, dt); }
+      else if (S.mode === 'fps') stepFps(dt);
       else step(dt);
       R.stepParts(dt);
     },
