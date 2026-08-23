@@ -40,8 +40,17 @@
     <div id="toast-layer"></div>
     <button id="btn-ragdoll" aria-label="Go limp (R)"><canvas></canvas></button>
     <button id="btn-attack" aria-label="Attack" hidden>✊</button>
+    <div id="prop-tray" hidden>
+      <div class="tray-head">
+        <span>Spawn a prop</span>
+        <button class="tray-x" id="btn-props-close" aria-label="Close">✕</button>
+      </div>
+      <div id="prop-list"></div>
+      <button class="lab-btn lab-btn-clear" id="btn-props-clear">✕ Clear props</button>
+    </div>
     <div id="lab-controls" hidden>
       <button class="lab-btn" id="btn-lab-spawn">＋ Spawn</button>
+      <button class="lab-btn lab-btn-props" id="btn-lab-props">🧰 Props</button>
       <button class="lab-btn lab-btn-clear" id="btn-lab-clear">✕ Clear</button>
     </div>
     <div id="retry" hidden>
@@ -122,6 +131,7 @@
           <button class="tab active" data-tab="upgrade">Gear</button>
           <button class="tab" data-tab="skin">Skins</button>
           <button class="tab" data-tab="hat">Hats</button>
+          <button class="tab" data-tab="face">Face</button>
           <button class="tab" data-tab="build">Build</button>
           <button class="tab" data-tab="anim">Anim</button>
         </div>
@@ -152,7 +162,6 @@
         </div>
         <div class="rows stab" data-stab="sound" hidden>
           <label class="row"><span>Sound effects</span><input type="checkbox" id="set-sfx"></label>
-          <label class="row"><span>Music</span><input type="checkbox" id="set-music"></label>
           <div class="row static"><span>Audio<i id="audio-state">—</i></span><button class="buy" id="btn-test-sound">Test</button></div>
           <div class="row static"><span><i>No sound on an iPad? Check the mute switch or Control Centre — Safari silences web audio when the device is on silent.</i></span></div>
         </div>
@@ -269,6 +278,7 @@
 <script src="js/items.js"></script>
 <script src="js/stick.js"></script>
 <script src="js/level.js"></script>
+<script src="js/props.js"></script>
 <script src="js/lab.js"></script>
 <script src="js/arena.js"></script>
 <script src="js/gore.js"></script>

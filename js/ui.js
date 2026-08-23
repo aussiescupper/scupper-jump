@@ -102,9 +102,42 @@
     }
   }
 
+  /* ---------------- the prop tray ----------------
+     Tap an entry and it drops into the room. The tray stays open so you can
+     stack a few up before you start throwing. */
+  function buildPropTray() {
+    const list = $('#prop-list');
+    list.innerHTML = '';
+    for (const k of SL.props.CATALOGUE) {
+      const row = document.createElement('button');
+      row.className = 'prop-row';
+      row.type = 'button';
+      if (k.fixed) row.dataset.fixed = '1';
+      row.innerHTML = '<span class="em"></span><span class="tx"><b></b><i></i></span>';
+      row.querySelector('.em').textContent = k.icon;
+      row.querySelector('b').textContent = k.name;
+      row.querySelector('i').textContent = k.blurb;
+      row.addEventListener('click', (e) => {
+        e.stopPropagation();
+        SL.audio.unlock();
+        SL.lab.spawnProp(SL.game.S, k.id);
+      });
+      list.appendChild(row);
+    }
+  }
+
+  function toggleTray(want) {
+    const tray = $('#prop-tray');
+    const on = want == null ? tray.hidden : want;
+    tray.hidden = !on;
+    $('#btn-lab-props').dataset.on = on ? '1' : '0';
+    SL.audio.play(on ? 'ui' : 'back');
+  }
+
   /* ---------------- shop ---------------- */
   function preview(skinId, hatId, buildId, opts) {
     opts = opts || {};
+    const faceId = opts.face || SL.save.equipped('face');
     const c = document.createElement('canvas');
     const size = 56, dpr = Math.min(2, window.devicePixelRatio || 1);
     c.width = size * dpr; c.height = size * dpr;
@@ -113,11 +146,31 @@
       x.setTransform(dpr, 0, 0, dpr, 0, 0);
       x.clearRect(0, 0, size, size);
       x.save();
-      x.translate(size / 2, size - 6);
-      x.scale(1.16, 1.16);
-      SL.stick.draw(x, { skin: skinId, hat: hatId, build: buildId,
-        styles: opts.styles, pose: opts.pose || 'idle',
-        phase, facing: 1, t: 0.6 });
+      if (opts.zoomHead) {
+        /* A face is four pixels across on a whole-body preview, and zooming the
+           whole figure just fills the card with shoulders. Draw the head on its
+           own — a portrait, not a shrunken man. */
+        const col = SL.stick.skinColour(skinId, 0.6);
+        const r = SL.stick.HEAD_R * SL.items.buildOf(buildId).head;
+        const z = (size - 14) / (r * 2);
+        x.translate(size / 2, size / 2);
+        x.scale(z, z);
+        /* In game the head is an outline and the face is drawn in the skin
+           colour on the dark showing through it. Paint that dark in, or the
+           face is skin-on-skin and disappears. */
+        x.fillStyle = '#0e1421';
+        x.beginPath(); x.arc(0, 0, r, 0, Math.PI * 2); x.fill();
+        x.strokeStyle = col;
+        x.lineWidth = 1.5;
+        x.beginPath(); x.arc(0, 0, r, 0, Math.PI * 2); x.stroke();
+        SL.stick.drawFace(x, faceId, col, r, 1, 0.6);
+      } else {
+        x.translate(size / 2, size - 6);
+        x.scale(1.16, 1.16);
+        SL.stick.draw(x, { skin: skinId, hat: hatId, build: buildId, face: faceId,
+          styles: opts.styles, pose: opts.pose || 'idle',
+          phase, facing: 1, t: 0.6 });
+      }
       x.restore();
     };
     if (opts.animate) {
@@ -156,6 +209,7 @@
       if (it.type === 'skin') art.appendChild(preview(it.id, SL.save.equipped('hat'), SL.save.equipped('build')));
       else if (it.type === 'hat') art.appendChild(preview(SL.save.equipped('skin'), it.id, SL.save.equipped('build')));
       else if (it.type === 'build') art.appendChild(preview(SL.save.equipped('skin'), SL.save.equipped('hat'), it.id));
+      else if (it.type === 'face') art.appendChild(preview(SL.save.equipped('skin'), 'hat_none', SL.save.equipped('build'), { face: it.id, zoomHead: true }));
       else if (it.type === 'walk' || it.type === 'jump' || it.type === 'idle') {
         const styles = { walk: SL.save.equipped('walk'), jump: SL.save.equipped('jump'), idle: SL.save.equipped('idle') };
         styles[it.type] = it.id;
@@ -254,7 +308,7 @@
   }
 
   function renderSettings() {
-    const map = { 'set-sfx': 'sfx', 'set-music': 'music', 'set-haptic': 'haptic', 'set-gore': 'gore', 'set-blood': 'blood', 'set-lowfx': 'lowfx', 'set-touch': 'forceTouch' };
+    const map = { 'set-sfx': 'sfx', 'set-haptic': 'haptic', 'set-gore': 'gore', 'set-blood': 'blood', 'set-lowfx': 'lowfx', 'set-touch': 'forceTouch' };
     Object.keys(map).forEach(id => {
       const n = document.getElementById(id);
       if (n) n.checked = !!SL.save.setting(map[id]);
@@ -323,6 +377,7 @@
       $('#btn-ragdoll').hidden = !!h.lab;
       $('.climb-rail').hidden = !!h.lab;
       $('#lab-controls').hidden = !h.lab;
+      if (!h.lab && !$('#prop-tray').hidden) toggleTray(false);
       if (h.lab) document.getElementById('touch').hidden = true;
       /* fight pit: health bar, wave, purse, and a fist instead of go-limp */
       $('#hud-wave-n').textContent = h.wave;
@@ -337,7 +392,7 @@
         $('#btn-ragdoll').hidden = true;
         $('.climb-rail').hidden = true;
       }
-      $('#btn-attack').hidden = !(h.arena && touchWanted());
+      $('#btn-attack').hidden = !(touchWanted() && !h.lab);
       $('#hud-coin-sep').hidden = !!h.endless;
       $('#hud-coin-t').hidden = !!h.endless;
       $('#climb-fill').style.height = (h.progress * 100).toFixed(1) + '%';
@@ -497,6 +552,12 @@
     $('#btn-pit-menu').addEventListener('click', () => { SL.audio.play('back'); SL.game.showcase(SL.save.data.unlocked); show('title', false); });
     $('#btn-lab-spawn').addEventListener('click', (e) => { e.stopPropagation(); SL.audio.unlock(); SL.lab.addOne(SL.game.S); });
     $('#btn-lab-clear').addEventListener('click', (e) => { e.stopPropagation(); SL.audio.unlock(); SL.lab.clearRoom(SL.game.S); });
+    buildPropTray();
+    $('#btn-lab-props').addEventListener('click', (e) => { e.stopPropagation(); SL.audio.unlock(); toggleTray(); });
+    $('#btn-props-close').addEventListener('click', (e) => { e.stopPropagation(); toggleTray(false); });
+    $('#btn-props-clear').addEventListener('click', (e) => {
+      e.stopPropagation(); SL.audio.unlock(); SL.lab.clearProps(SL.game.S);
+    });
     $('#btn-levels').addEventListener('click', () => { SL.audio.play('ui'); show('levels', true); });
     $('#btn-shop').addEventListener('click', () => { SL.audio.play('ui'); show('shop', true); });
     $('#btn-settings').addEventListener('click', () => { SL.audio.play('ui'); show('settings', true); });
@@ -535,7 +596,7 @@
     $('#btn-end-shop').addEventListener('click', () => { SL.audio.play('ui'); stack.length = 0; stack.push('title'); show('shop', false); });
     $('#btn-end-menu').addEventListener('click', () => { SL.audio.play('back'); SL.game.showcase(SL.save.data.unlocked); show('title', false); });
 
-    const map = { 'set-sfx': 'sfx', 'set-music': 'music', 'set-haptic': 'haptic', 'set-gore': 'gore', 'set-blood': 'blood', 'set-lowfx': 'lowfx', 'set-touch': 'forceTouch' };
+    const map = { 'set-sfx': 'sfx', 'set-haptic': 'haptic', 'set-gore': 'gore', 'set-blood': 'blood', 'set-lowfx': 'lowfx', 'set-touch': 'forceTouch' };
     Object.keys(map).forEach(id => {
       const n = document.getElementById(id);
       if (!n) return;

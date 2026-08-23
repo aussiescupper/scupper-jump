@@ -198,8 +198,12 @@
     const platById = {};
     for (const p of plats) platById[p.id] = p;
 
+    /* Bystanders loitering on blocks, worth a punch. Generated from their own
+       RNG stream after the fact, so the tower itself is bit-for-bit unchanged. */
+    const folk = makeFolk(plats, 0xF01C + n * 3331, 0.2);
+
     return {
-      n, W, height: goalY, goalY, plats, platById, coins, saws,
+      n, W, height: goalY, goalY, plats, platById, coins, saws, folk,
       theme: themeFor(n),
       difficulty: d,
       parTime,
@@ -207,6 +211,33 @@
       coinCount: coins.length,
       seedTag: 'L' + n
     };
+  }
+
+  const FOLK_SKINS = ['#ff6b6b', '#57b6ff', '#b6ff5c', '#c9a4ff', '#ff8a3d', '#5cffc1', '#ffd166', '#e9eefb'];
+  const FOLK_HATS = [null, 'hat_cap', 'hat_beanie', 'hat_cork', 'hat_akubra', 'hat_crown', 'hat_prop'];
+  const FOLK_FACES = ['face_classic', 'face_happy', 'face_angry', 'face_surprised', 'face_sleepy', 'face_cool'];
+  const FOLK_BUILDS = ['build_classic', 'build_classic', 'build_lanky', 'build_stocky', 'build_buff', 'build_pip'];
+
+  /** Put idlers on some of the wider blocks. `seed` is separate from the tower's
+      own stream so adding them cannot shift a single platform. */
+  function makeFolk(plats, seed, chance) {
+    const rng = rngFor(seed >>> 0 || 7);
+    const folk = [];
+    for (let i = 4; i < plats.length; i++) {
+      const p = plats[i];
+      if (p.type === 'goal' || p.type === 'ground' || p.type === 'bouncy') continue;
+      if (p.w < 44 || p.spike) continue;
+      if (!rng.chance(chance)) continue;
+      folk.push({
+        plat: p.id, ox: rng.range(-p.w * 0.24, p.w * 0.24),
+        colour: FOLK_SKINS[Math.floor(rng.next() * FOLK_SKINS.length)],
+        hat: FOLK_HATS[Math.floor(rng.next() * FOLK_HATS.length)],
+        face: FOLK_FACES[Math.floor(rng.next() * FOLK_FACES.length)],
+        build: FOLK_BUILDS[Math.floor(rng.next() * FOLK_BUILDS.length)],
+        facing: rng.sign(), phase: rng.range(0, 6.28), gone: false
+      });
+    }
+    return folk;
   }
 
   /* ---------------- the endless tower ----------------
@@ -222,7 +253,7 @@
       theme: THEMES[Math.floor(rng.next() * THEMES.length)],
       difficulty: 0, parTime: Infinity,
       goalY: 5000,                  // only sizes the backdrop; there is no goal
-      top: 0, coinCount: 0, totalCoinValue: 0, seedTag: 'endless',
+      top: 0, coinCount: 0, totalCoinValue: 0, seedTag: 'endless', folk: [], folkFrom: 1,
       gen: { rng, id: 0, st: { dir: rng.sign(), riskRun: 0 }, prev: null }
     };
     const ground = { id: lv.gen.id++, type: 'ground', x: 0, y: 0, w: W, h: PLAT_T, hx: W / 2 };
@@ -263,6 +294,10 @@
           speed: rng.range(0.45, 0.5 + 0.6 * d) * (rng.next() < 0.5 ? -1 : 1), phase: rng.range(0, 6.28) });
       }
     }
+    /* top the bystanders up over whatever was just built */
+    const fresh = makeFolk(lv.plats.slice(lv.folkFrom), (0xF01C + lv.plats.length * 7919) >>> 0, 0.18);
+    for (const f of fresh) lv.folk.push(f);
+    lv.folkFrom = lv.plats.length;
     lv.difficulty = endlessD(lv.top);
     return lv;
   }
@@ -277,6 +312,10 @@
     }
     for (let i = lv.coins.length - 1; i >= 0; i--) if (lv.coins[i].y < belowY) lv.coins.splice(i, 1);
     for (let i = lv.saws.length - 1; i >= 0; i--) if (lv.saws[i].y < belowY) lv.saws.splice(i, 1);
+    for (let i = lv.folk.length - 1; i >= 0; i--) {
+      const p = lv.platById[lv.folk[i].plat];
+      if (!p || p.y < belowY) lv.folk.splice(i, 1);
+    }
   }
 
   /* live x of a platform / saw at time t */
@@ -286,6 +325,6 @@
   }
   function sawX(s, t) { return s.x + Math.sin(t * s.speed + s.phase) * (s.range / 2); }
 
-  SL.level = { generate, generateEndless, extendEndless, pruneEndless, endlessD,
+  SL.level = { generate, generateEndless, extendEndless, pruneEndless, endlessD, makeFolk,
     platX, sawX, THEMES, themeFor, W, PLAT_T, BASE, MAX_RISE, reach };
 })(window.SL);

@@ -2,3 +2,6 @@
 Thumbs.db
 *.log
 node_modules/
+
+# local dev server config
+.claude/

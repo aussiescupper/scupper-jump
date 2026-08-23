@@ -107,9 +107,32 @@ Gravity in here is dialled down to 42% — bodies hang and drift rather than dro
 which gives you time to watch what you did. They still come down: a fall from the ceiling lands
 hard enough to pay.
 
-**Spawn** and **Clear** sit top right, clear of the floor where everything happens. Spawn tops the
-room up to fourteen; Clear wipes the bodies, the giblets and every stain. The movement controls are
-hidden in here — there is nothing to drive.
+**Spawn**, **Props** and **Clear** sit top right, clear of the floor where everything happens.
+Spawn tops the room up to fourteen; Clear wipes the bodies, the giblets and every stain. The
+movement controls are hidden in here — there is nothing to drive.
+
+**Props** opens a spawn list down the right-hand side. Eight of them are loose objects you pick up
+and swing:
+
+| | |
+|---|---|
+| Sword | long and light, takes limbs off |
+| Cleaver | short, mean, barely needs a swing |
+| Chainsaw | the chain runs whether you are moving or not |
+| Buzz Saw | free-spinning blade, cuts on contact |
+| Sledgehammer | all the weight in the head |
+| Anvil | for dropping |
+| Bowling Ball | heavy, round, rolls into a crowd |
+| Bomb | 4-second fuse, or set it off with a hard enough hit |
+
+The other two are fixtures that stay where you put them: a **Blender** you feed people into, which
+minces and fills up as it goes, and a **Spike Bed** that punishes anything landing hard on it.
+
+Every loose prop is a two-point Verlet capsule — a business end and a tail, held apart by one
+distance constraint — so it swings, tumbles and takes a grab using the machinery the ragdolls
+already use. The heavier end drags the lighter one round, which is why a sledgehammer swings like a
+sledgehammer and a sword flicks like a sword. Blades test their whole sweep rather than just where
+they ended up, or a fast swing would pass clean through somebody without touching them.
 
 The bodies are the same Verlet ragdoll as everywhere else, so they come apart and bleed on a hard
 enough hit. Payouts are rate-limited to one per body per wallop and capped per body — without that
@@ -135,6 +158,10 @@ not grow without bound. Every metre pays Stick Credits; your best climb is kept.
 | Ice | very low friction | 10 |
 | Sawblade | patrols the gaps between blocks | 12 |
 
+Some blocks have a **bystander** loitering on them. Walk up and punch — <kbd>F</kbd>, <kbd>X</kbd> or
+<kbd>Shift</kbd>, or the fist button — and they come off for credits, ragdolling down the tower behind you. They are generated from their own
+RNG stream after the tower is built, so adding them left all forty levels byte-for-byte unchanged.
+
 Eight themes rotate every four levels — The Back Fence, Outback Run, Bondi Rise, Reef Ascent,
 Harbour Lights, Uluru at Dusk, Snowy Peaks, Southern Cross.
 
@@ -150,6 +177,10 @@ Harbour Lights, Uluru at Dusk, Snowy Peaks, Southern Cross.
 | Lucky Charm ×2 | +15% then +35% credits earned |
 | Guardian | start each attempt with a shield that soaks one hazard |
 | Checkpoint Beacon | respawn at the halfway mark instead of the bottom |
+
+Nine **faces** — Two Dots, Cheerful, Furious, Startled, Half Asleep, Shades, Robot, X Eyes and
+Featureless. Drawn in head-local space so they scale with whatever build you are wearing, and worn
+everywhere he appears, including the bystanders you knock off blocks.
 
 Six **builds** change his shape — Classic, Lanky, Stocky, Absolute Unit, Buff and Pipsqueak —
 altering line weight, limb spread, head size and, on the heavier ones, a gut. These are drawing
@@ -242,6 +273,7 @@ js/save.js          localStorage-backed progress
 js/audio.js         WebAudio synth — every sound is generated, no audio files
 js/items.js         shop catalogue + the modifiers it feeds to the physics
 js/stick.js         the stickman renderer (game canvas AND shop previews)
+js/props.js         smash lab props: swings, cuts, blenders, bombs
 js/lab.js           the smash lab: a room, some bodies, and a wallet
 js/level.js         procedural towers, the endless tower, the reachability proof
 js/gore.js          the Verlet ragdoll, the cut plane, organs, blood, stains

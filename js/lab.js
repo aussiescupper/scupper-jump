@@ -19,6 +19,7 @@
   const GRAB_RADIUS = 30;
   const MAX_BODIES = 14;            // hard ceiling on the spawn button
   const DESPAWN_REST = 6;           // seconds of lying still before a body is cleared away
+  const MAX_PROPS = 8;              // loose props in the room at once
 
   const rnd = (a, b) => a + Math.random() * (b - a);
   const SKINS = ['#e9eefb', '#ff6b6b', '#57b6ff', '#b6ff5c', '#3ddc97', '#ffd166', '#c9a4ff', '#ff8a3d'];
@@ -119,7 +120,14 @@
     }
   }
 
+  /** The per-body billing fields, in case a body arrived by some other route.
+      Without them the cap reads as NaN and a single body pays forever. */
+  function billable(lab, rd) {
+    if (rd.paid == null) { rd.paid = 0; rd.lastPay = -99; rd.bornT = lab.t; }
+  }
+
   function onSmash(S, lab, rd, impact, p, plat) {
+    billable(lab, rd);
     if (impact < SMASH_MIN) return;
     if (lab.t - rd.bornT < SPAWN_GRACE) return;          // it only just arrived
     rd.hp -= impact / 26;
@@ -153,11 +161,80 @@
     SL.util.vibrate(SL.save.data.settings.haptic ? Math.min(30, 6 + pay) : 0);
   }
 
+  /* Props bill through here. Same cooldown and same per-body cap as a wall
+     smash, so a blender cannot print money either — it just gets there faster. */
+  const PROP_BONUS = { blender: 8, bomb: 12, blade: 5, spikes: 6, prop: 2 };
+  function payHit(S, lab, rd, impact, pt, tag) {
+    billable(lab, rd);
+    if (impact < SMASH_MIN * 0.5) return;
+    if (lab.t - rd.bornT < SPAWN_GRACE) return;
+    rd.hp -= impact / 30;
+    if (lab.t - rd.lastPay < PAY_COOLDOWN) return;
+    if (rd.paid >= BODY_CAP) return;
+    rd.lastPay = lab.t;
+
+    let pay = Math.round(impact / PAY_DIV) + (PROP_BONUS[tag] || 2);
+    pay = clamp(pay, 1, BODY_CAP - rd.paid);
+    rd.paid += pay;
+    lab.earned += pay;
+    lab.pending += pay;
+    lab.combo = Math.min(9, lab.combo + 1);
+    lab.comboT = 1.2;
+    lab.pops.push({ x: pt.x, y: pt.y, v: pay, t: 0, big: pay > 12 });
+    if (lab.pops.length > 24) lab.pops.shift();
+    SL.audio.play(tag === 'blade' || tag === 'spikes' ? 'squelch' : 'splat');
+    SL.util.vibrate(SL.save.data.settings.haptic ? Math.min(30, 6 + pay) : 0);
+  }
+
+  /** What the props call back into. */
+  function propHooks(S, lab) {
+    return {
+      pay: (rd, impact, pt, tag) => payHit(S, lab, rd, impact, pt, tag),
+      cut: (rd, y, f) => SL.gore.cut(S, rd, y, f),
+      knock: (fig, vx, vy) => toLimp(S, lab, fig, vx, vy),
+      boom: (x, y) => {
+        SL.render.burst(x, y, 30, { c: '#ffd166', speed: 340, g: 240, r: 3.4, life: 0.6 });
+        SL.render.burst(x, y, 18, { c: '#ff5a4b', speed: 210, g: 120, r: 4.6, life: 0.5 });
+        SL.audio.play('splat');
+        SL.util.vibrate(SL.save.data.settings.haptic ? 60 : 0);
+      }
+    };
+  }
+
+  /** Drop a prop in from the catalogue. */
+  function spawnProp(S, id) {
+    const lab = S.lab;
+    if (!lab) return false;
+    const k = SL.props.byId[id];
+    if (!k) return false;
+    if (k.fixed) {
+      /* only one of each fixture, and it goes where there is room */
+      const had = lab.props.findIndex((p) => p.id === id);
+      if (had >= 0) lab.props.splice(had, 1);
+      lab.props.push(SL.props.make(id, rnd(k.w / 2 + 10, W - k.w / 2 - 10), 0));
+    } else {
+      if (lab.props.filter((p) => !p.fixed).length >= MAX_PROPS) { SL.audio.play('nope'); return false; }
+      lab.props.push(SL.props.make(id, rnd(40, W - 40), CEILING - 60));
+    }
+    SL.audio.play('ui');
+    return true;
+  }
+
+  /** Bin the loose props, keep the fixtures. */
+  function clearProps(S) {
+    const lab = S.lab;
+    if (!lab) return 0;
+    const n = lab.props.length;
+    lab.props.length = 0;
+    SL.audio.play('back');
+    return n;
+  }
+
   /* ---------------- lifecycle ---------------- */
   function start(S) {
     S.level = buildArena(S);
     S.lab = {
-      bodies: [], standing: [], pops: [], earned: 0, pending: 0, banked: 0,
+      bodies: [], standing: [], props: [], pops: [], earned: 0, pending: 0, banked: 0,
       combo: 0, comboT: 0, grab: null, t: 0, spawnT: 0
     };
     SL.gore.reset(S);
@@ -174,14 +251,14 @@
     /* the grabbed point is dragged straight to the cursor; letting go throws it */
     const gr = lab.grab;
     if (gr) {
-      const p = gr.rd.pts[gr.i];
+      const p = gr.pts[gr.i];
       const nx = clamp(gr.x, p.r, W - p.r);
       const ny = Math.max(p.r, gr.y);
       p.px = nx - (nx - p.x) * 0.55;
       p.py = ny - (ny - p.y) * 0.55;
       p.x = nx; p.y = ny;
-      gr.rd.asleep = false;
-      gr.rd.restT = 0;
+      if (gr.rd) { gr.rd.asleep = false; gr.rd.restT = 0; }
+      if (gr.prop && gr.prop.dead) lab.grab = null;
     }
 
     for (let i = lab.bodies.length - 1; i >= 0; i--) {
@@ -193,12 +270,13 @@
         if (Math.abs(p.x - p.px) > 0.03 || Math.abs(p.y - p.py) > 0.03) { moving = true; break; }
       }
       rd.restT = moving ? 0 : rd.restT + dt;
-      if (rd !== (gr && gr.rd) && (rd.restT > DESPAWN_REST || rd.hp <= 0 && rd.restT > 1.5)) {
+      if (rd !== (gr && gr.rd) && (rd.restT > DESPAWN_REST || (rd.hp <= 0 && rd.restT > 1.5))) {
         lab.bodies.splice(i, 1);
         if (gr && gr.rd === rd) lab.grab = null;
       }
     }
 
+    SL.props.step(S, lab, dt, propHooks(S, lab));
     stepStanding(lab, dt);
     checkKnockovers(S, lab);
 
@@ -245,7 +323,14 @@
         const d = (p.x - wx) * (p.x - wx) + (p.y - wy) * (p.y - wy);
         if (d < bd) { bd = d; bi = i; }
       }
-      lab.grab = { rd, i: bi, x: wx, y: wy };
+      lab.grab = { rd, prop: null, pts: rd.pts, i: bi, x: wx, y: wy };
+      return true;
+    }
+
+    const pr = SL.props.grabPoint(lab, wx, wy, GRAB_RADIUS);
+    if (pr) {
+      lab.grab = { rd: null, prop: pr.prop, pts: pr.pts, i: pr.i, x: wx, y: wy };
+      SL.audio.play('ui');
       return true;
     }
 
@@ -258,7 +343,7 @@
       }
     }
     if (!best) return false;
-    lab.grab = { rd: best.rd, i: best.i, x: wx, y: wy };
+    lab.grab = { rd: best.rd, prop: null, pts: best.rd.pts, i: best.i, x: wx, y: wy };
     best.rd.asleep = false;
     SL.audio.play('ui');
     return true;
@@ -278,6 +363,7 @@
     const n = lab.bodies.length + lab.standing.length;
     lab.bodies.length = 0;
     lab.standing.length = 0;
+    lab.props.length = 0;
     lab.pops.length = 0;
     lab.grab = null;
     SL.gore.reset(S);
@@ -303,7 +389,7 @@
 
     /* a ring round whatever you are holding */
     if (lab.grab) {
-      const p = lab.grab.rd.pts[lab.grab.i];
+      const p = lab.grab.pts[lab.grab.i];
       ctx.save();
       ctx.strokeStyle = 'rgba(255,176,55,.85)';
       ctx.lineWidth = 1.8;
@@ -323,6 +409,7 @@
       ctx.restore();
     }
     for (const rd of lab.bodies) SL.gore.drawRagdoll(ctx, rd, toY, t);
+    SL.props.draw(ctx, lab, toY, t);
 
     for (const pop of lab.pops) {
       const a = 1 - pop.t / 1.1;
@@ -337,5 +424,5 @@
     ctx.globalAlpha = 1;
   }
 
-  SL.lab = { start, step, draw, grabAt, moveGrab, release, isGrabbing, clearRoom, addOne, population, POP, MAX_BODIES, CEILING, GRAVITY };
+  SL.lab = { start, step, draw, grabAt, moveGrab, release, isGrabbing, clearRoom, clearProps, addOne, spawnProp, population, POP, MAX_BODIES, CEILING, GRAVITY };
 })(window.SL);

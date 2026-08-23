@@ -644,6 +644,14 @@
     g.t = 0;
   }
 
+  /** Drop a ready-made ragdoll into the world; it settles under stepOld. */
+  function addBody(S, rd) {
+    ensure(S);
+    S.gore.old.push({ rd, parts: [], ropes: [], drops: [], settled: false });
+    if (S.gore.old.length > MAX_OLD) S.gore.old.shift();
+    return rd;
+  }
+
   /** Bin the body but keep the mess it made. Used when it has fallen out of sight. */
   function vanish(S) {
     ensure(S);
@@ -881,7 +889,7 @@
     ctx.restore();
   }
 
-  SL.gore = { reset, softReset, retire, spawn, spawnLimp, kill, vanish, topOf, step, stepOld, focus, drawDecals, drawParts, drawOld, splash,
+  SL.gore = { reset, softReset, retire, addBody, spawn, spawnLimp, kill, vanish, topOf, step, stepOld, focus, drawDecals, drawParts, drawOld, splash,
     /* reusable pieces, for the smash lab */
     makeRagdoll, stepBody, drawRagdoll, cut, stain, splashAt: splash, HEAD, CHEST, HIP };
 })(window.SL);

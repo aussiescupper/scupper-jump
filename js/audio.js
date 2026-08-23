@@ -4,8 +4,8 @@
 (function (SL) {
   'use strict';
 
-  let ctx = null, master = null, sfxBus = null, musicBus = null;
-  let started = false, musicTimer = 0, musicStep = 0, prime = null;
+  let ctx = null, master = null, sfxBus = null;
+  let started = false, prime = null;
   let lastSound = 0, idleTimer = 0;
   const IDLE_MS = 2200;             // silence for this long and the route is released
 
@@ -116,7 +116,6 @@
     master = ctx.createGain(); master.gain.value = 0.9;
     master.connect(softClip(ctx)).connect(ctx.destination);
     sfxBus = ctx.createGain(); sfxBus.gain.value = 1; sfxBus.connect(master);
-    musicBus = ctx.createGain(); musicBus.gain.value = 0; musicBus.connect(master);
     return ctx;
   }
 
@@ -154,17 +153,11 @@
     applySettings();
   }
 
-  const wantsSound = () => {
-    const s = SL.save.data.settings;
-    return !!(s.sfx || s.music);
-  };
+  const wantsSound = () => !!SL.save.data.settings.sfx;
 
   function applySettings() {
     if (!ctx) return;
-    const s = SL.save.data.settings;
-    sfxBus.gain.setTargetAtTime(s.sfx ? 1 : 0, ctx.currentTime, 0.02);
-    musicBus.gain.setTargetAtTime(s.music ? 0.3 : 0, ctx.currentTime, 0.05);
-    if (s.music) startMusic(); else stopMusic();
+    sfxBus.gain.setTargetAtTime(wantsSound() ? 1 : 0, ctx.currentTime, 0.02);
     if (!wantsSound()) suspend();          // all off means all off, not gain 0
     else { lastSound = now(); wake(); }
     watchIdle();
@@ -190,7 +183,6 @@
     idleTimer = setInterval(() => {
       if (!ctx || !started) return;
       if (!wantsSound()) { suspend(); return; }
-      if (SL.save.data.settings.music) return;      // music needs it open
       if (now() - lastSound > IDLE_MS) suspend();
     }, 600);
   }
@@ -208,29 +200,6 @@
     } catch (e) { /* never let audio break the game */ }
   }
 
-  /* ---------------- music ----------------
-     Short plucks in a mid register. The old bed held a 65Hz sine for 1.1s at a
-     time, which had more sustained energy than the effects did and read as a
-     hum that masked them. */
-  const SCALE = [0, 4, 7, 11, 12, 11, 7, 4];
-  function startMusic() {
-    if (musicTimer || !ctx) return;
-    musicStep = 0;
-    musicTimer = setInterval(() => {
-      if (!SL.save.data.settings.music || !started || !ctx) return;
-      const root = 261.63;                       // C4, well clear of the mud
-      const semi = SCALE[musicStep % SCALE.length];
-      const f = root * Math.pow(2, semi / 12);
-      try {
-        voice(ctx, musicBus, { type: 'triangle', f, dur: 0.26, gain: 0.5 }, ctx.currentTime);
-        if (musicStep % 8 === 0) {
-          voice(ctx, musicBus, { type: 'sine', f: f / 2, dur: 0.3, gain: 0.35 }, ctx.currentTime);
-        }
-      } catch (e) { /* ignore */ }
-      musicStep++;
-    }, 360);
-  }
-  function stopMusic() { clearInterval(musicTimer); musicTimer = 0; }
 
   /* ---------------- diagnostics ---------------- */
   function state() {
@@ -240,7 +209,6 @@
       ctx: ctx ? ctx.state : 'none',
       sampleRate: ctx ? ctx.sampleRate : 0,
       sfx: !!SL.save.data.settings.sfx,
-      music: !!SL.save.data.settings.music,
       idleFor: started ? Math.round((now() - lastSound) / 100) / 10 : 0
     };
   }

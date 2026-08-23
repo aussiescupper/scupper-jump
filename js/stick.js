@@ -208,6 +208,72 @@
     return IDLE.idle_classic(f, phase);
   }
 
+  /* Faces are drawn in head-local space: origin at the head centre, nominal
+     radius 4.4, then scaled to whatever radius the build gives it. */
+  function drawFace(ctx, id, colour, r, facing, t) {
+    if (id === 'face_blank') return;
+    ctx.save();
+    const k = r / HEAD_R;
+    ctx.scale(k, k);
+    ctx.fillStyle = colour;
+    ctx.strokeStyle = colour;
+    ctx.lineCap = 'round';
+    const ex = facing * 1.35, ex2 = -facing * 1.1, ey = -0.7;
+    const dot = (x, y, rr) => { ctx.beginPath(); ctx.arc(x, y, rr, 0, 6.284); ctx.fill(); };
+    const line = (x1, y1, x2, y2, w) => {
+      ctx.lineWidth = w || 0.75;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    };
+    switch (id) {
+      case 'face_happy':
+        dot(ex, ey, 0.62); dot(ex2, ey, 0.62);
+        ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.arc(facing * 0.15, 0.35, 1.85, 0.3, Math.PI - 0.3); ctx.stroke();
+        break;
+      case 'face_angry':
+        dot(ex, ey + 0.15, 0.6); dot(ex2, ey + 0.15, 0.6);
+        line(ex + 0.9, ey - 1.9, ex - 0.5, ey - 1.05);
+        line(ex2 - 0.9, ey - 1.9, ex2 + 0.5, ey - 1.05);
+        ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.arc(facing * 0.15, 2.6, 1.7, Math.PI + 0.35, -0.35); ctx.stroke();
+        break;
+      case 'face_surprised':
+        dot(ex, ey - 0.2, 0.92); dot(ex2, ey - 0.2, 0.92);
+        ctx.lineWidth = 0.7;
+        ctx.beginPath(); ctx.arc(facing * 0.15, 1.5, 0.95, 0, 6.284); ctx.stroke();
+        break;
+      case 'face_sleepy':
+        line(ex - 0.9, ey, ex + 0.9, ey, 0.7);
+        line(ex2 - 0.9, ey, ex2 + 0.9, ey, 0.7);
+        line(facing * -0.6, 1.6, facing * 0.9, 1.6, 0.65);
+        break;
+      case 'face_cool':
+        ctx.fillRect(-2.9, ey - 1.0, 5.8, 1.9);
+        ctx.lineWidth = 0.6;
+        line(-2.9, ey - 0.1, -3.9, ey - 0.5);
+        line(2.9, ey - 0.1, 3.9, ey - 0.5);
+        ctx.lineWidth = 0.75;
+        ctx.beginPath(); ctx.arc(facing * 0.15, 1.3, 1.3, 0.35, Math.PI - 0.35); ctx.stroke();
+        break;
+      case 'face_robot':
+        ctx.fillRect(ex - 0.75, ey - 0.75, 1.5, 1.5);
+        ctx.fillRect(ex2 - 0.75, ey - 0.75, 1.5, 1.5);
+        ctx.lineWidth = 0.55;
+        for (let i = -1; i <= 1; i++) line(-1.5, 1.5 + i * 0.75, 1.5, 1.5 + i * 0.75, 0.45);
+        break;
+      case 'face_dead':
+        ctx.lineWidth = 0.7;
+        for (const cx of [ex, ex2]) {
+          line(cx - 0.85, ey - 0.85, cx + 0.85, ey + 0.85);
+          line(cx + 0.85, ey - 0.85, cx - 0.85, ey + 0.85);
+        }
+        break;
+      default:
+        dot(ex, ey, 0.65); dot(ex2, ey, 0.65);
+    }
+    ctx.restore();
+  }
+
   function drawHat(ctx, hatId, colour, t, facing) {
     if (!hatId || hatId === 'hat_none') return;
     const y = HEAD_Y, r = HEAD_R, f = facing;
@@ -342,12 +408,13 @@
     ctx.stroke();
     if (fx === 'ghost') { ctx.globalAlpha *= 0.35; ctx.fill(); ctx.globalAlpha /= 0.35; }
 
-    /* eyes — a tiny bit of life */
+    /* the face */
     ctx.shadowBlur = 0;
-    ctx.fillStyle = colour;
-    const ex = p.lean * 1.4 + facing * 1.4 * b.head, ey = HEAD_Y + D - 0.5;
-    ctx.beginPath(); ctx.arc(ex, ey, 0.65 * b.head, 0, 7); ctx.fill();
-    ctx.beginPath(); ctx.arc(ex - facing * 2.5 * b.head, ey, 0.65 * b.head, 0, 7); ctx.fill();
+    ctx.save();
+    ctx.translate(p.lean * 1.4, HEAD_Y + D);
+    drawFace(ctx, o.face || (SL.save && SL.save.equipped ? SL.save.equipped('face') : null),
+      colour, HEAD_R * b.head, facing, t);
+    ctx.restore();
 
     ctx.save();
     ctx.translate(p.lean * 1.4, D);
@@ -384,5 +451,5 @@
     ctx.restore();
   }
 
-  SL.stick = { draw, drawHat, logo, skinColour, H, HEAD_Y, HEAD_R };
+  SL.stick = { draw, drawHat, drawFace, logo, skinColour, H, HEAD_Y, HEAD_R };
 })(window.SL);

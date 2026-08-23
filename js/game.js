@@ -44,7 +44,7 @@
     return {
       x, y, w: PW, h: PH, vx: 0, vy: 0,
       onGround: false, coyote: 0, buffer: 0, jumpsLeft: 0, cutJump: false,
-      facing: 1, pose: 'idle', animPhase: 0, squash: 1, rot: 0,
+      facing: 1, pose: 'idle', animPhase: 0, squash: 1, rot: 0, swing: 0, swingCd: 0, kick: false,
       trail: [], trailT: 0,
       dead: false, deadT: 0, invuln: 0, ride: null, wallDir: 0
     };
@@ -145,7 +145,12 @@
     if (S.run.arena) {
       if (input.attackEdge) { input.attackEdge = false; SL.arena.playerAttack(S); }
       SL.arena.step(S, dt);
+    } else if (input.attackEdge) {
+      input.attackEdge = false;
+      swing();
     }
+    if (pl.swingCd > 0) pl.swingCd -= dt;
+    if (pl.swing > 0) { pl.swing -= dt; if (!S.run.arena) punchFolk(); }
 
     /* animate platform states regardless of player */
     for (const p of lv.plats) {
@@ -435,7 +440,8 @@
 
     /* -------- animation -------- */
     pl.squash = damp(pl.squash, 1, 13, dt);
-    if (!pl.onGround) { pl.rot = 0; pl.pose = pl.vy > 40 ? 'jump' : 'fall'; }
+    if (pl.swing > 0) { pl.rot = 0; pl.pose = pl.kick ? 'kick' : 'punch'; }
+    else if (!pl.onGround) { pl.rot = 0; pl.pose = pl.vy > 40 ? 'jump' : 'fall'; }
     else if (Math.abs(pl.vx) > 22) { pl.rot = 0; pl.pose = 'run'; pl.animPhase += Math.abs(pl.vx) * dt * 0.075; }
     else { pl.rot = 0; pl.pose = 'idle'; pl.animPhase += dt * 2.2; }
 
@@ -453,6 +459,55 @@
       if (skin.fx === 'sparkle' && Math.random() < 0.22) R.burst(pl.x + PW / 2, pl.y + 15, 1, { c: '#ffe9a8', speed: 25, g: 90, r: 1.8, life: 0.6, jitter: 14 });
       if (skin.fx === 'matrix' && Math.random() < 0.3) R.burst(pl.x + PW / 2, pl.y + 14, 1, { c: '#5cffc1', speed: 15, g: 140, r: 1.8, life: 0.5, jitter: 12, square: true });
     }
+  }
+
+  /* ---------------- bystanders ----------------
+     Idlers loitering on blocks. Harmless; worth a punch. */
+  function swing() {
+    const pl = S.player;
+    if (pl.dead || S.limp || pl.swing > 0 || pl.swingCd > 0) return false;
+    pl.swing = 0.12;
+    pl.swingCd = 0.3;
+    pl.kick = !pl.onGround;
+    SL.audio.play(pl.kick ? 'djump' : 'jump');
+    return true;
+  }
+
+  function punchFolk() {
+    const lv = S.level, pl = S.player;
+    if (!lv.folk || !lv.folk.length) return;
+    const px = pl.x + PW / 2;
+    const cx = px + pl.facing * 16, cy = pl.y + 16;
+    for (const f of lv.folk) {
+      if (f.gone) continue;
+      const p = lv.platById[f.plat];
+      if (!p || p.broken) continue;
+      const fx = LV.platX(p, S.time) + p.w / 2 + f.ox;
+      if (Math.abs(fx - cx) > 26) continue;
+      if (Math.abs((p.y + 15) - cy) > 26) continue;
+      if ((fx - px) * pl.facing < -8) continue;          // behind you
+      knockOff(f, p, fx);
+      return;
+    }
+  }
+
+  function knockOff(f, p, fx) {
+    const pl = S.player;
+    f.gone = true;
+    const rd = SL.gore.makeRagdoll(fx, p.y + 1, {
+      vx: pl.facing * (pl.kick ? 320 : 240), vy: pl.kick ? 300 : 210,
+      colour: f.colour, hat: f.hat, build: f.build, alive: false
+    });
+    SL.gore.addBody(S, rd);
+    const pay = 8 + Math.floor((S.level.n || 1) / 2);
+    S.run.folkValue = (S.run.folkValue || 0) + pay;
+    S.run.punted = (S.run.punted || 0) + 1;
+    SL.save.addCredits(pay);
+    SL.audio.play('hurt');
+    SL.util.vibrate(SL.save.data.settings.haptic ? 12 : 0);
+    R.burst(fx, p.y + 16, 8, { c: f.colour, speed: 150, g: 320, r: 2.6, life: 0.5 });
+    fire('toast', '+' + pay);
+    S.hudDirty = true;
   }
 
   /* the swing poses take priority over the usual walk cycle */
@@ -587,6 +642,7 @@
         { k: 'Coins ' + collected + '/' + lv.coins.length, v: run.value },
         { k: 'Time ' + SL.util.fmtTime(run.elapsed) + (timeBonus ? ' (under par)' : ''), v: timeBonus },
         { k: 'No deaths', v: noDeath },
+        { k: 'Punted ' + (run.punted || 0), v: run.folkValue || 0 },
         { k: 'Every coin', v: perfect }
       ].filter(r => r.v > 0),
       luckyMul: m.payoutMul, replayMul: run.replay ? 0.3 : 1,
@@ -772,7 +828,14 @@
     get limp() { return S.limp; },
     /* headless single step — used by the playtest bot and by tests, not by the
        loop. Ages particles too, or a headless run accumulates them forever. */
-    tick(dt) { if (S.level) { step(dt); R.stepParts(dt); } },
+    /* Headless step, used by the test harness. Dispatches on mode the same way
+       the rAF loop does, so what a test drives is what actually runs. */
+    tick(dt) {
+      if (!S.level) return;
+      if (S.mode === 'lab') { S.time += dt; SL.lab.step(S, dt); }
+      else step(dt);
+      R.stepParts(dt);
+    },
     get mode() { return S.mode; },
     startLoop() { if (!raf) { last = 0; raf = requestAnimationFrame(loop); } },
     refreshMods() { S.mods = SL.items.modifiers(); if (S.player) S.player.jumpsLeft = Math.max(S.player.jumpsLeft, 0); }

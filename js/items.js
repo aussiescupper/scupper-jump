@@ -28,6 +28,19 @@
     { id: 'hat_prop',  name: 'Propeller Beanie', price: 1400, desc: 'Spins. Provides no lift whatsoever.' }
   ];
 
+  /* --------- faces: what he is doing with his head --------- */
+  const FACES = [
+    { id: 'face_classic',   name: 'Two Dots',   price: 0,   desc: 'The face he was born with.' },
+    { id: 'face_happy',     name: 'Cheerful',   price: 120, desc: 'Delighted, regardless of events.' },
+    { id: 'face_angry',     name: 'Furious',    price: 180, desc: 'Brows down. Taking this personally.' },
+    { id: 'face_surprised', name: 'Startled',   price: 180, desc: 'Permanently caught off guard.' },
+    { id: 'face_sleepy',    name: 'Half Asleep', price: 220, desc: 'Eyes shut. Climbing on autopilot.' },
+    { id: 'face_cool',      name: 'Shades',     price: 380, desc: 'Too cool to look where he is going.' },
+    { id: 'face_robot',     name: 'Robot',      price: 460, desc: 'Square eyes, grille for a mouth.' },
+    { id: 'face_dead',      name: 'X Eyes',     price: 300, desc: 'Getting ahead of himself.' },
+    { id: 'face_blank',     name: 'Featureless', price: 260, desc: 'Nothing at all. Unsettling.' }
+  ];
+
   /* --------- builds: the shape of him. Purely how he is drawn — the hitbox
        never changes, so nothing about the physics or the levels shifts. --------- */
   const BUILDS = [
@@ -100,6 +113,7 @@
   SKINS.forEach(s => (byId[s.id] = Object.assign({ type: 'skin' }, s)));
   HATS.forEach(h => (byId[h.id] = Object.assign({ type: 'hat' }, h)));
   BUILDS.forEach(b => (byId[b.id] = Object.assign({ type: 'build' }, b)));
+  FACES.forEach(f => (byId[f.id] = Object.assign({ type: 'face' }, f)));
   WALKS.forEach(w => (byId[w.id] = Object.assign({ type: 'walk', group: 'Walking' }, w)));
   JUMPS.forEach(j => (byId[j.id] = Object.assign({ type: 'jump', group: 'Jumping' }, j)));
   IDLES.forEach(i => (byId[i.id] = Object.assign({ type: 'idle', group: 'Standing' }, i)));
@@ -134,8 +148,9 @@
 
   const ANIMS = WALKS.concat(JUMPS, IDLES);
 
-  SL.items = { SKINS, HATS, GEAR, BUILDS, WALKS, JUMPS, IDLES, ANIMS,
+  SL.items = { SKINS, HATS, GEAR, BUILDS, FACES, WALKS, JUMPS, IDLES, ANIMS,
     byId, modifiers, price, maxTier, buildOf,
     list: (type) => (type === 'skin' ? SKINS : type === 'hat' ? HATS
-      : type === 'build' ? BUILDS : type === 'anim' ? ANIMS : GEAR).map(i => byId[i.id]) };
+      : type === 'build' ? BUILDS : type === 'face' ? FACES
+      : type === 'anim' ? ANIMS : GEAR).map(i => byId[i.id]) };
 })(window.SL);

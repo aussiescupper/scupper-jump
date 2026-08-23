@@ -124,6 +124,55 @@ body{
 .lab-btn:active{transform:scale(.95)}
 .lab-btn-clear{color:#ff9aa3;border-color:rgba(255,93,108,.4)}
 .lab-btn-clear:hover{background:rgba(255,93,108,.16)}
+.lab-btn-props{color:#ffd166;border-color:rgba(255,209,102,.42)}
+.lab-btn-props:hover{background:rgba(255,209,102,.14)}
+.lab-btn-props[data-on="1"]{background:rgba(255,209,102,.2);border-color:rgba(255,209,102,.8)}
+
+/* ============ the prop tray ============
+   Slides in from the right so the floor — where the smashing happens —
+   stays clear. */
+#prop-tray{
+  position:absolute;right:calc(8px + var(--safe-r));top:calc(106px + var(--safe-t));
+  bottom:calc(14px + var(--safe-b));width:min(196px, 62%);
+  display:flex;flex-direction:column;gap:8px;
+  background:rgba(9,13,23,.86);border:1.5px solid var(--line2);border-radius:16px;
+  padding:10px;z-index:6;
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  box-shadow:0 14px 40px rgba(0,0,0,.55);
+  animation:trayIn .18s cubic-bezier(.2,1.2,.4,1);
+}
+@keyframes trayIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+.tray-head{
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--dim);padding:0 2px 2px;
+}
+.tray-x{
+  cursor:pointer;font-family:inherit;font-size:13px;line-height:1;color:var(--dim);
+  background:none;border:0;padding:4px 6px;border-radius:8px;
+}
+.tray-x:hover{background:rgba(255,255,255,.08);color:var(--txt)}
+#prop-list{
+  flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  display:flex;flex-direction:column;gap:6px;padding-right:2px;
+}
+.prop-row{
+  display:flex;align-items:center;gap:9px;width:100%;text-align:left;
+  cursor:pointer;font-family:inherit;color:var(--txt);
+  background:rgba(255,255,255,.045);border:1px solid var(--line);border-radius:11px;
+  padding:8px 9px;transition:transform .06s,background .12s,border-color .12s;
+}
+.prop-row:hover{background:rgba(255,255,255,.1);border-color:var(--line2)}
+.prop-row:active{transform:scale(.97)}
+.prop-row .em{font-size:19px;line-height:1;flex:none;filter:saturate(1.1)}
+.prop-row .tx{min-width:0}
+.prop-row .tx b{display:block;font-size:12.5px;font-weight:800;letter-spacing:-.01em}
+.prop-row .tx i{
+  display:block;font-style:normal;font-size:10px;color:var(--dim);line-height:1.25;
+  margin-top:1px;
+}
+.prop-row[data-fixed="1"]{border-color:rgba(87,182,255,.34);background:rgba(87,182,255,.08)}
+.prop-row[data-fixed="1"]:hover{background:rgba(87,182,255,.16)}
 
 /* ============ death prompt ============ */
 #retry{

@@ -458,6 +458,22 @@
     SL.gore.drawDecals(S, ctx, toY, t);
     SL.gore.drawOld(S, ctx, toY, t);
 
+    /* the locals, minding their own business on the blocks */
+    if (lv.folk) for (const f of lv.folk) {
+      if (f.gone) continue;
+      const p = lv.platById[f.plat];
+      if (!p || p.broken) continue;
+      const sy = toY(p.y);
+      if (sy < -60 || sy > view.h + 60) continue;
+      ctx.save();
+      ctx.translate(LV.platX(p, t) + p.w / 2 + f.ox, sy);
+      SL.stick.draw(ctx, {
+        colour: f.colour, hat: f.hat, face: f.face, build: f.build,
+        pose: 'idle', phase: t * 2.1 + f.phase, facing: f.facing, t
+      });
+      ctx.restore();
+    }
+
     /* saws */
     for (const s of lv.saws) {
       const sy = toY(s.y);

@@ -6,10 +6,10 @@
   const DEFAULTS = () => ({
     credits: 0,
     unlocked: 1,          // highest level the player may enter
-    owned: { skin_classic: 1, hat_none: 1, build_classic: 1,
+    owned: { skin_classic: 1, hat_none: 1, build_classic: 1, face_classic: 1,
       walk_classic: 1, jump_classic: 1, idle_classic: 1 },
     upgrades: {},          // id -> tier owned (1-based)
-    equip: { skin: 'skin_classic', hat: 'hat_none', build: 'build_classic',
+    equip: { skin: 'skin_classic', hat: 'hat_none', build: 'build_classic', face: 'face_classic',
       walk: 'walk_classic', jump: 'jump_classic', idle: 'idle_classic' },
     progress: {},          // levelNumber -> {t:bestTime, d:bestDeaths, c:bestCoins, s:stars}
     stats: { runs: 0, deaths: 0, jumps: 0, coins: 0, earned: 0, playtime: 0 },
