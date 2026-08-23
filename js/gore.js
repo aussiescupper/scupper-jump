@@ -105,6 +105,7 @@
       colour: o.colour || '#e9eefb',
       hat: o.hat || null,
       build: o.build || null,
+      mine: !!o.mine,
       headRot: 0, headSpin: 0,
       burst: false, asleep: false,
       alive: !!o.alive,
@@ -125,6 +126,7 @@
       colour: SL.stick.skinColour(SL.save.equipped('skin'), S.time),
       hat: SL.save.equipped('hat'),
       build: SL.save.equipped('build'),
+      mine: true,                     // it is your body, so it wears your drawing
       alive: !!opts.alive
     });
     g.rd = rd;
@@ -748,6 +750,26 @@
       ctx.moveTo(a.x, toY(a.y));
       ctx.lineTo(q.x, toY(q.y));
       ctx.stroke();
+    }
+
+    /* Your marker drawing, pinned to the torso. The skeleton's y runs the
+       opposite way to SL.stick's, so the hip-to-chest bone gives the angle and
+       the scale, and the drawing rides it round as the body tumbles. Limb
+       scribbles drift a little; chest ones stay put, which is what matters. */
+    if (rd.mine && SL.doodle && SL.doodle.has() && !rd.bones[1].dead) {
+      const hip = pts[HIP], cst = pts[CHEST];
+      const vx = cst.x - hip.x, vy = toY(cst.y) - toY(hip.y);
+      const len = Math.hypot(vx, vy);
+      if (len > 0.5) {
+        ctx.save();
+        ctx.translate(hip.x, toY(hip.y));
+        ctx.rotate(Math.atan2(vx, -vy));
+        const k = len / 9.5;                      // hip-to-chest is 9.5 units
+        ctx.scale(k, k);
+        ctx.translate(0, 11);                     // put local (0,-11) on the hip
+        SL.doodle.stamp(ctx, null);          // globalAlpha is already the caller's
+        ctx.restore();
+      }
     }
 
     /* head, oriented along the neck while it is still attached */

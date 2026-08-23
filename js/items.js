@@ -109,6 +109,13 @@
       desc: 'Plants a flag at the halfway mark of every tower.' }
   ];
 
+  /* Not a thing you wear — a thing you use. Buying it turns the Draw tab from
+     a shop card into a sketchpad. */
+  const TOOLS = [
+    { id: 'tool_marker', name: 'Marker Pen', price: 450, glyph: '🖊️',
+      desc: 'Draw whatever you like on yourself. It stays on in every mode.' }
+  ];
+
   const byId = {};
   SKINS.forEach(s => (byId[s.id] = Object.assign({ type: 'skin' }, s)));
   HATS.forEach(h => (byId[h.id] = Object.assign({ type: 'hat' }, h)));
@@ -118,6 +125,7 @@
   JUMPS.forEach(j => (byId[j.id] = Object.assign({ type: 'jump', group: 'Jumping' }, j)));
   IDLES.forEach(i => (byId[i.id] = Object.assign({ type: 'idle', group: 'Standing' }, i)));
   GEAR.forEach(g => (byId[g.id] = Object.assign({ type: 'upgrade' }, g)));
+  TOOLS.forEach(o => (byId[o.id] = Object.assign({ type: 'tool' }, o)));
 
   /* Roll every owned upgrade into one set of numbers the game reads each frame. */
   function modifiers() {
@@ -148,9 +156,9 @@
 
   const ANIMS = WALKS.concat(JUMPS, IDLES);
 
-  SL.items = { SKINS, HATS, GEAR, BUILDS, FACES, WALKS, JUMPS, IDLES, ANIMS,
+  SL.items = { SKINS, HATS, GEAR, BUILDS, FACES, WALKS, JUMPS, IDLES, ANIMS, TOOLS,
     byId, modifiers, price, maxTier, buildOf,
     list: (type) => (type === 'skin' ? SKINS : type === 'hat' ? HATS
       : type === 'build' ? BUILDS : type === 'face' ? FACES
-      : type === 'anim' ? ANIMS : GEAR).map(i => byId[i.id]) };
+      : type === 'anim' ? ANIMS : type === 'draw' ? TOOLS : GEAR).map(i => byId[i.id]) };
 })(window.SL);

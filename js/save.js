@@ -16,6 +16,7 @@
     endless: { best: 0 },
     arena: { best: 0 },
     ops: { best: 0 },
+    doodle: { strokes: [] },
     settings: { sfx: true, music: false, haptic: true, lowfx: false, forceTouch: false, gore: true, blood: true },
     seen: { howto: false }
   });
@@ -39,6 +40,9 @@
         data.endless = Object.assign(base.endless, parsed.endless || {});
         data.arena = Object.assign(base.arena, parsed.arena || {});
         data.ops = Object.assign(base.ops, parsed.ops || {});
+        /* the marker scribbles: kept whole, not merged key by key */
+        data.doodle = (parsed.doodle && Array.isArray(parsed.doodle.strokes))
+          ? { strokes: parsed.doodle.strokes } : { strokes: [] };
         data.upgrades = parsed.upgrades || {};
         data.progress = parsed.progress || {};
       }

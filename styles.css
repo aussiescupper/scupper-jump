@@ -410,6 +410,51 @@ kbd{background:rgba(255,255,255,.10);border:1px solid var(--line2);border-bottom
 }
 #btn-attack.on,#btn-attack:active{background:rgba(255,93,108,.45);transform:scale(.93)}
 
+/* ============ the marker pen ============ */
+.draw-panel{
+  display:flex;gap:14px;align-items:center;flex-wrap:wrap;
+  background:rgba(255,255,255,.045);border:1px solid var(--line);border-radius:16px;padding:14px;
+}
+.draw-panel-art{
+  flex:0 0 auto;width:96px;height:96px;border-radius:14px;
+  background:rgba(8,11,18,.5);border:1px solid var(--line);
+  display:grid;place-items:center;
+}
+.draw-panel-body{flex:1 1 200px;min-width:170px}
+.draw-panel-body .shop-group{margin:0 0 3px}
+.draw-panel-body .menu-row{margin-top:12px}
+
+#draw-stage{
+  position:relative;margin:2px 0 12px;border-radius:16px;overflow:hidden;
+  background:
+    linear-gradient(rgba(255,255,255,.028) 1px, transparent 1px) 0 0/100% 14px,
+    linear-gradient(90deg, rgba(255,255,255,.028) 1px, transparent 1px) 0 0/14px 100%,
+    radial-gradient(120% 80% at 50% 0%, #182034, #0a0e18);
+  border:1px solid var(--line2);
+}
+#draw-canvas{display:block;width:100%;touch-action:none;cursor:crosshair}
+#draw-hint{
+  position:absolute;left:0;right:0;bottom:10px;text-align:center;pointer-events:none;
+  font-size:11.5px;font-weight:700;color:var(--dim);letter-spacing:.02em;
+}
+#draw-hint[hidden]{display:none}
+#draw-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+#draw-palette{display:flex;gap:7px;flex-wrap:wrap;flex:1 1 auto}
+.swatch{
+  width:30px;height:30px;border-radius:50%;cursor:pointer;padding:0;
+  border:2px solid rgba(255,255,255,.22);transition:transform .07s,border-color .1s;
+}
+.swatch:active{transform:scale(.9)}
+.swatch.on{border-color:#fff;transform:scale(1.12)}
+#draw-sizes{display:flex;gap:6px;flex:0 0 auto}
+.nib{
+  width:34px;height:30px;border-radius:10px;cursor:pointer;padding:0;
+  background:rgba(255,255,255,.05);border:1px solid var(--line);
+  display:grid;place-items:center;
+}
+.nib i{display:block;border-radius:50%;background:var(--txt)}
+.nib.on{background:rgba(255,176,55,.18);border-color:var(--acc)}
+
 /* ============ Stick Ops ============ */
 .btn-ops{
   background:linear-gradient(180deg,rgba(61,220,151,.17),rgba(61,220,151,.09));

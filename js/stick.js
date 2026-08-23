@@ -423,6 +423,18 @@
     drawHat(ctx, o.hat, colour, t, facing);
     ctx.restore();
 
+    /* Whatever they drew on themselves, over the top of everything. It rides
+       the lean and the crouch so it stays stuck to the body, but it does not
+       bend with the limbs — it is drawn on, not painted per-bone. */
+    if (o.doodle && SL.doodle) {
+      ctx.save();
+      ctx.shadowBlur = 0;
+      ctx.translate(p.lean, D);
+      if (facing < 0) ctx.scale(-1, 1);
+      SL.doodle.stamp(ctx, o.alpha);
+      ctx.restore();
+    }
+
     ctx.restore();
   }
 

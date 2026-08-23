@@ -556,7 +556,7 @@
       ctx.save();
       ctx.translate(pl.x + pl.w / 2, toY(pl.y));
       SL.stick.draw(ctx, {
-        skin: SL.save.equipped('skin'), hat: SL.save.equipped('hat'),
+        skin: SL.save.equipped('skin'), hat: SL.save.equipped('hat'), doodle: true,
         pose: pl.pose, phase: pl.animPhase, facing: pl.facing, t, squash: pl.squash, rot: pl.rot,
         alpha: (S.run && S.run.arena) ? SL.arena.playerAlpha(S) : 1
       });

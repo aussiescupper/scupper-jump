@@ -208,6 +208,20 @@ Harbour Lights, Uluru at Dusk, Snowy Peaks, Southern Cross.
 | Guardian | start each attempt with a shield that soaks one hazard |
 | Checkpoint Beacon | respawn at the halfway mark instead of the bottom |
 
+The **Marker Pen** (450) unlocks the Draw tab, which is a sketchpad rather than a shelf. Whatever
+you scribble is kept as strokes in the stickman's own local units — the same space `SL.stick` draws
+in, feet at the origin — so it travels into every mode at every size without being re-fitted, and
+mirrors with him when he turns round. Replaying strokes per figure per frame would be daft, so they
+are baked once into an offscreen canvas and blitted; the bake is thrown away only when the drawing
+changes. Nine colours, three nib sizes, undo and clear.
+
+It rides your ragdoll too. The skeleton's y axis runs opposite to `SL.stick`'s, so the hip-to-chest
+bone supplies the angle and the scale and the drawing tumbles with the body. Limb scribbles drift a
+little as the joints move; anything on the chest stays where you put it.
+
+Only you wear it — bystanders, Smash Lab figures and Stick Ops enemies are drawn without it, since
+the doodle is opt-in per draw call.
+
 Nine **faces** — Two Dots, Cheerful, Furious, Startled, Half Asleep, Shades, Robot, X Eyes and
 Featureless. Drawn in head-local space so they scale with whatever build you are wearing, and worn
 everywhere he appears, including the bystanders you knock off blocks.
@@ -310,6 +324,7 @@ js/save.js          localStorage-backed progress
 js/audio.js         WebAudio synth — every sound is generated, no audio files
 js/items.js         shop catalogue + the modifiers it feeds to the physics
 js/stick.js         the stickman renderer (game canvas AND shop previews)
+js/doodle.js        the marker pen: strokes in body-local units, baked once
 js/fps.js           Stick Ops: the raycaster, the maze, and the people in it
 js/props.js         smash lab props: swings, cuts, blenders, bombs
 js/lab.js           the smash lab: a room, some bodies, and a wallet

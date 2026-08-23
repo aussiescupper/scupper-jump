@@ -22,6 +22,7 @@
     if (name === 'levels') renderLevels();
     if (name === 'shop') renderShop();
     if (name === 'settings') renderSettings();
+    if (name === 'draw') { if (!drawState.ready) bindPad(); paintPad(); }
     walletAll();
   }
 
@@ -141,7 +142,7 @@
     opts = opts || {};
     const faceId = opts.face || SL.save.equipped('face');
     const c = document.createElement('canvas');
-    const size = 56, dpr = Math.min(2, window.devicePixelRatio || 1);
+    const size = opts.big ? 88 : 56, dpr = Math.min(2, window.devicePixelRatio || 1);
     c.width = size * dpr; c.height = size * dpr;
     const x = c.getContext('2d');
     const paint = (phase) => {
@@ -166,11 +167,14 @@
         x.lineWidth = 1.5;
         x.beginPath(); x.arc(0, 0, r, 0, Math.PI * 2); x.stroke();
         SL.stick.drawFace(x, faceId, col, r, 1, 0.6);
+      } else if (opts.big) {
+        x.translate(size / 2, size - 8);
+        x.scale(1.5, 1.5);
       } else {
         x.translate(size / 2, size - 6);
         x.scale(1.16, 1.16);
         SL.stick.draw(x, { skin: skinId, hat: hatId, build: buildId, face: faceId,
-          styles: opts.styles, pose: opts.pose || 'idle',
+          doodle: opts.doodle !== false, styles: opts.styles, pose: opts.pose || 'idle',
           phase, facing: 1, t: 0.6 });
       }
       x.restore();
@@ -198,6 +202,8 @@
     $$('#shop-tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === shopTab));
     const items = SL.items.list(shopTab);
     const credits = SL.save.credits();
+
+    if (shopTab === 'draw' && SL.doodle.owned()) { renderDrawPanel(grid); return; }
 
     let lastGroup = null;
     for (const it of items) {
@@ -254,6 +260,16 @@
           if (price > credits) btn.classList.add('poor');
           btn.addEventListener('click', () => buyUpgrade(it));
         }
+      } else if (it.type === 'tool') {
+        if (SL.save.owns(it.id)) {
+          btn.textContent = 'Open';
+          btn.classList.add('equip');
+          btn.addEventListener('click', () => { SL.audio.play('ui'); show('draw'); });
+        } else {
+          btn.textContent = fmtNum(it.price);
+          if (it.price > credits) btn.classList.add('poor');
+          btn.addEventListener('click', () => buyTool(it));
+        }
       } else {
         const owned = SL.save.owns(it.id) || it.price === 0;
         const slot = it.type;    // 'skin' | 'hat' | 'build'
@@ -272,6 +288,158 @@
     }
   }
 
+  /* Owning the pen turns the tab into a page about your drawing rather than a
+     row of things to buy. */
+  function renderDrawPanel(grid) {
+    const panel = el('div', 'draw-panel');
+    const art = el('div', 'draw-panel-art');
+    art.appendChild(preview(SL.save.equipped('skin'), SL.save.equipped('hat'),
+      SL.save.equipped('build'), { big: true }));
+    panel.appendChild(art);
+
+    const body = el('div', 'draw-panel-body');
+    body.appendChild(el('h3', 'shop-group', 'Marker Pen'));
+    const n = SL.doodle.strokes().length;
+    body.appendChild(el('div', 'card-desc', n
+      ? n + (n === 1 ? ' stroke' : ' strokes') + ' on you. It shows in every mode.'
+      : 'Nothing on you yet. Open the pad and scribble.'));
+    const row = el('div', 'menu-row');
+    const open = el('button', 'btn btn-primary', '🖊️ Open the pad');
+    open.addEventListener('click', () => { SL.audio.play('ui'); show('draw'); });
+    row.appendChild(open);
+    const wipe = el('button', 'btn btn-ghost', 'Clear all');
+    wipe.disabled = !n;
+    wipe.addEventListener('click', () => {
+      if (SL.doodle.clear()) { SL.audio.play('back'); renderShop(); }
+    });
+    row.appendChild(wipe);
+    body.appendChild(row);
+    panel.appendChild(body);
+    grid.appendChild(panel);
+  }
+
+  /* ---------------- the sketchpad ----------------
+     The canvas is the figure's own local space blown up to fill the stage, so a
+     stroke drawn here is stored in exactly the units SL.stick draws in and needs
+     no re-fitting when it turns up on a 20px-tall figure in the Fight Pit. */
+  const drawState = { colour: null, size: null, pts: null, scale: 1, ready: false };
+
+  function drawUnits(e, cv) {
+    const r = cv.getBoundingClientRect();
+    const D = SL.doodle;
+    return {
+      x: D.X0 + (e.clientX - r.left) / r.width * D.W,
+      y: D.Y0 + (e.clientY - r.top) / r.height * D.H
+    };
+  }
+
+  function paintPad() {
+    const cv = $('#draw-canvas');
+    const D = SL.doodle;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const cssW = cv.clientWidth || 280;
+    const cssH = cssW * (D.H / D.W);
+    cv.width = Math.round(cssW * dpr);
+    cv.height = Math.round(cssH * dpr);
+    cv.style.height = cssH + 'px';
+    const x = cv.getContext('2d');
+    const k = cssW / D.W * dpr;
+    x.setTransform(k, 0, 0, k, -D.X0 * k, -D.Y0 * k);
+    x.clearRect(D.X0, D.Y0, D.W, D.H);
+
+    /* the figure you are drawing on, and a faint floor so he is standing */
+    x.strokeStyle = 'rgba(233,238,251,.14)';
+    x.lineWidth = 0.4;
+    x.beginPath(); x.moveTo(D.X0, 0.6); x.lineTo(D.X1, 0.6); x.stroke();
+    SL.stick.draw(x, {
+      skin: SL.save.equipped('skin'), hat: SL.save.equipped('hat'),
+      build: SL.save.equipped('build'), face: SL.save.equipped('face'),
+      pose: 'idle', phase: 1.1, facing: 1, t: 0.6
+    });
+    SL.doodle.paint(x, SL.doodle.strokes());
+    if (drawState.pts && drawState.pts.length >= 4) {
+      SL.doodle.paint(x, [{ c: drawState.colour, w: drawState.size, p: drawState.pts }]);
+    }
+    $('#draw-hint').hidden = SL.doodle.has() || !!drawState.pts;
+  }
+
+  function bindPad() {
+    const D = SL.doodle;
+    drawState.colour = D.COLOURS[0];
+    drawState.size = D.SIZES[1];
+
+    const pal = $('#draw-palette');
+    pal.innerHTML = '';
+    D.COLOURS.forEach((c) => {
+      const b = el('button', 'swatch');
+      b.style.background = c;
+      b.dataset.c = c;
+      b.addEventListener('click', () => {
+        drawState.colour = c;
+        $$('#draw-palette .swatch').forEach(o => o.classList.toggle('on', o.dataset.c === c));
+        SL.audio.play('ui');
+      });
+      pal.appendChild(b);
+    });
+    pal.firstChild.classList.add('on');
+
+    const sizes = $('#draw-sizes');
+    sizes.innerHTML = '';
+    D.SIZES.forEach((w, i) => {
+      const b = el('button', 'nib' + (i === 1 ? ' on' : ''));
+      const dot = el('i');
+      dot.style.width = dot.style.height = (5 + i * 5) + 'px';
+      b.appendChild(dot);
+      b.addEventListener('click', () => {
+        drawState.size = w;
+        $$('#draw-sizes .nib').forEach((o, j) => o.classList.toggle('on', j === i));
+        SL.audio.play('ui');
+      });
+      sizes.appendChild(b);
+    });
+
+    const cv = $('#draw-canvas');
+    let id = null;
+    cv.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      id = e.pointerId;
+      try { cv.setPointerCapture(id); } catch (err) { /* ignore */ }
+      const p = drawUnits(e, cv);
+      drawState.pts = [p.x, p.y];
+      paintPad();
+    });
+    cv.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== id || !drawState.pts) return;
+      e.preventDefault();
+      const p = drawUnits(e, cv);
+      const n = drawState.pts.length;
+      /* skip points that have barely moved, or a slow drag eats the budget */
+      if (Math.hypot(p.x - drawState.pts[n - 2], p.y - drawState.pts[n - 1]) < 0.25) return;
+      drawState.pts.push(p.x, p.y);
+      paintPad();
+    });
+    const finish = (e) => {
+      if (e.pointerId !== id || !drawState.pts) return;
+      id = null;
+      SL.doodle.add(drawState.colour, drawState.size, drawState.pts);
+      drawState.pts = null;
+      SL.audio.play('ui');
+      paintPad();
+    };
+    cv.addEventListener('pointerup', finish);
+    cv.addEventListener('pointercancel', finish);
+    cv.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    $('#btn-draw-undo').addEventListener('click', () => {
+      if (SL.doodle.undo()) { SL.audio.play('back'); paintPad(); }
+    });
+    $('#btn-draw-clear').addEventListener('click', () => {
+      if (SL.doodle.clear()) { SL.audio.play('back'); paintPad(); }
+    });
+    $('#btn-draw-done').addEventListener('click', () => { SL.audio.play('ui'); back(); });
+    drawState.ready = true;
+  }
+
   function buyUpgrade(it) {
     const tier = SL.save.tier(it.id);
     const price = it.prices[tier];
@@ -285,6 +453,13 @@
     if (!SL.save.spend(it.price)) { SL.audio.play('nope'); flashWallet(); return; }
     SL.save.grant(it.id);
     SL.save.equip(it.type, it.id);
+    SL.audio.play('buy');
+    renderShop(); walletAll();
+  }
+  /* A tool has no slot to go in — buying it just unlocks what the tab does. */
+  function buyTool(it) {
+    if (!SL.save.spend(it.price)) { SL.audio.play('nope'); flashWallet(); return; }
+    SL.save.grant(it.id);
     SL.audio.play('buy');
     renderShop(); walletAll();
   }
