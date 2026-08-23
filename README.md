@@ -202,7 +202,7 @@ renderer that draws the stickman in game.
 | | |
 |---|---|
 | Move | <kbd>A</kbd>/<kbd>D</kbd> or <kbd>←</kbd>/<kbd>→</kbd> |
-| Punch (Fight Pit) | <kbd>F</kbd>, <kbd>X</kbd> or <kbd>Shift</kbd> |
+| Punch | <kbd>F</kbd>, <kbd>X</kbd> or <kbd>Shift</kbd> — bystanders on blocks, and the Fight Pit |
 | Jump | <kbd>Space</kbd>, <kbd>W</kbd> or <kbd>↑</kbd> — **hold for a higher jump** |
 | Go limp / get up | <kbd>R</kbd>, or the stickman button at the bottom of the screen |
 | Pause | <kbd>Esc</kbd> or <kbd>P</kbd> |
@@ -214,6 +214,12 @@ one star so it never passes for a real run.
 
 On a touch device an on-screen pad appears automatically. Gamepads work too (left stick / d-pad
 and the bottom face button).
+
+The touch controls sit in two rows: move and jump along the bottom, punch and go-limp above them
+on either side. Anything you can touch has to set `pointer-events:auto` — `#hud` and `#touch` are
+both `pointer-events:none` so the canvas underneath stays draggable — and any new control needs a
+slot that does not land on top of an existing one. Both mistakes are easy to make and neither
+shows up in a screenshot; `document.elementFromPoint` on each control's centre catches them.
 
 ## Running it
 

@@ -15,6 +15,8 @@
   --gold:#ffd166;
   --r:16px;
   --tap:clamp(76px, calc(var(--col-w, 100vw) * 0.25), 180px);
+  --sec:clamp(50px, calc(var(--col-w, 100vw) * 0.13), 96px);   /* ragdoll */
+  --fist:clamp(62px, calc(var(--col-w, 100vw) * 0.17), 118px);
   --tap-jump:clamp(88px, calc(var(--col-w, 100vw) * 0.29), 205px);
   --safe-t:env(safe-area-inset-top,0px);
   --safe-b:env(safe-area-inset-bottom,0px);
@@ -95,9 +97,9 @@ body{
   /* stacked above the jump button, which leaves the whole middle free for
      move buttons big enough to actually hit */
   position:absolute;
-  right:calc(18px + var(--safe-r) + (var(--tap-jump) - clamp(50px, calc(var(--col-w, 100vw) * 0.13), 96px)) / 2);
+  right:calc(18px + var(--safe-r) + (var(--tap-jump) - var(--sec)) / 2);
   bottom:calc(34px + var(--safe-b) + var(--tap-jump));
-  width:clamp(50px, calc(var(--col-w, 100vw) * 0.13), 96px);height:clamp(50px, calc(var(--col-w, 100vw) * 0.13), 96px);
+  width:var(--sec);height:var(--sec);
   border-radius:50%;pointer-events:auto;cursor:pointer;padding:0;
   background:rgba(233,238,251,.09);border:2px solid rgba(233,238,251,.26);
   display:grid;place-items:center;transition:transform .08s,background .12s,border-color .12s;
@@ -132,6 +134,8 @@ body{
    Slides in from the right so the floor — where the smashing happens —
    stays clear. */
 #prop-tray{
+  /* #hud is pointer-events:none — anything you can touch has to opt back in */
+  pointer-events:auto;
   position:absolute;right:calc(8px + var(--safe-r));top:calc(106px + var(--safe-t));
   bottom:calc(14px + var(--safe-b));width:min(196px, 62%);
   display:flex;flex-direction:column;gap:8px;
@@ -393,12 +397,15 @@ kbd{background:rgba(255,255,255,.10);border:1px solid var(--line2);border-bottom
   background:linear-gradient(90deg,#3ddc97,#b6ff5c);transition:width .12s linear}
 #hp-fill.low{background:linear-gradient(90deg,#ff5d6c,#ffb037)}
 #btn-attack{
+  /* Sits above the move buttons, mirroring the ragdoll button on the other
+     side. Its old slot was tuned before the move buttons were doubled in size
+     and now lands underneath them, so the punch never registered on touch. */
   position:absolute;pointer-events:auto;cursor:pointer;padding:0;
-  right:calc(18px + var(--safe-r) + var(--tap-jump) + 14px);
-  bottom:calc(22px + var(--safe-b));
-  width:var(--tap-jump);height:var(--tap-jump);border-radius:50%;
+  left:calc(18px + var(--safe-l) + (var(--tap) - var(--fist)) / 2);
+  bottom:calc(34px + var(--safe-b) + var(--tap-jump));
+  width:var(--fist);height:var(--fist);border-radius:50%;
   background:rgba(255,93,108,.16);border:2px solid rgba(255,93,108,.45);
-  color:#ff9aa3;font-size:calc(var(--tap-jump) * .34);line-height:1;
+  color:#ff9aa3;font-size:calc(var(--fist) * .42);line-height:1;
   display:grid;place-items:center;transition:transform .06s,background .1s;
 }
 #btn-attack.on,#btn-attack:active{background:rgba(255,93,108,.45);transform:scale(.93)}
